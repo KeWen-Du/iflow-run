@@ -2,12 +2,21 @@
 
 一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应用程序。
 
+[![npm version](https://badge.fury.io/js/iflow-run.svg)](https://www.npmjs.com/package/iflow-run)
+[![GitHub stars](https://img.shields.io/github/stars/KeWen-Du/iflow-run?style=social)](https://github.com/KeWen-Du/iflow-run)
+
 ## 功能特性
 
 - 📁 **项目管理** - 浏览和查看 iFlow CLI 创建的所有项目
 - 💬 **会话浏览** - 查看每个项目下的所有会话历史
 - 🔍 **消息详情** - 查看完整的对话消息，包括用户消息、助手响应、工具调用和工具结果
 - 👁️ **预览功能** - 快速预览会话的第一条消息内容
+- 📊 **会话上下文** - 显示工作目录、Git 分支、版本信息等环境上下文
+- 🔎 **消息筛选** - 支持按类型筛选消息（用户/助手/工具调用）和内容搜索
+- 💰 **Token 统计** - 显示模型名称、Token 消耗、执行时间和预估成本
+- 🔄 **环境追踪** - 检测并显示工作目录和 Git 分支的变更
+- 📥 **导出功能** - 支持导出会话为 Markdown 或 JSON 格式
+- 📋 **消息目录** - 快速导航到用户消息
 - 🎨 **现代 UI** - 采用暗色主题和玻璃拟态设计，提供优雅的用户体验
 - 📱 **响应式设计** - 支持桌面端和移动端访问
 
@@ -85,14 +94,16 @@ npx iflow-run
 
 ```
 iflow-run/
-├── server.js           # Express 服务器
-├── package.json        # 项目配置
-├── public/             # 前端静态文件
-│   ├── index.html      # 主页面
-│   ├── app.js          # 前端逻辑
-│   ├── styles.css      # 样式文件
-│   └── test.html       # 测试页面
-└── test_screenshot.py  # 自动化测试脚本
+├── server.js              # Express 服务器
+├── package.json           # 项目配置
+├── bin/                   # 全局可执行文件
+│   └── iflow-run.js      # CLI 入口文件
+├── public/                # 前端静态文件
+│   ├── index.html         # 主页面
+│   ├── app.js             # 前端逻辑
+│   ├── styles.css         # 样式文件
+│   └── test.html          # 测试页面
+└── test_screenshot.py     # 自动化测试脚本
 ```
 
 ## API 接口
@@ -112,6 +123,41 @@ GET /api/sessions/:projectId/:sessionId
 ```
 
 返回指定会话的完整消息记录。
+
+### 搜索会话
+
+```http
+GET /api/search?q=关键词&page=1&limit=20&type=all
+```
+
+查询参数：
+- `q` (string): 搜索关键词
+- `page` (number): 页码，默认 1
+- `limit` (number): 每页结果数，默认 20
+- `type` (string): 消息类型筛选，可选值：`all`、`user`、`assistant`，默认 `all`
+- `startDate` (number): 开始时间戳（可选）
+- `endDate` (number): 结束时间戳（可选）
+
+响应示例：
+```json
+{
+  "results": [
+    {
+      "projectId": "project-id",
+      "projectName": "项目名称",
+      "sessionId": "session-1234567890",
+      "content": "消息内容预览...",
+      "type": "user",
+      "timestamp": 1704110400000,
+      "uuid": "message-uuid"
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 5
+}
+```
 
 ## 配置
 
@@ -164,11 +210,7 @@ python test_screenshot.py
 3. 点击第一个会话并截图会话详情
 4. 测试返回按钮功能
 
-## 截图
 
-![项目列表](https://via.placeholder.com/400x300/1a1a24/ffffff?text=Projects+List)
-![会话列表](https://via.placeholder.com/400x300/1a1a24/ffffff?text=Sessions+List)
-![会话详情](https://via.placeholder.com/400x300/1a1a24/ffffff?text=Session+Detail)
 
 ## 开发
 
@@ -198,6 +240,7 @@ python test_screenshot.py
 1. `.iflow` 目录路径是否正确
 2. 目录下是否有 `projects` 子目录
 3. 项目目录中是否有 `session-*.jsonl` 文件
+4. 尝试使用 `--dir` 参数指定正确的 iflow 目录
 
 ### 消息显示为空？
 
@@ -205,6 +248,19 @@ python test_screenshot.py
 - 会话文件格式不正确
 - 消息内容不包含可显示的文本
 - 消息格式不符合预期
+- 使用了消息筛选功能，当前筛选条件下没有匹配的消息
+
+### 工具结果显示不完整？
+
+工具结果默认折叠显示，点击工具结果的标题栏可以展开查看完整内容。长结果会自动截断，可以通过复制按钮获取完整内容。
+
+### Token 统计不准确？
+
+Token 统计依赖于会话消息中的 `usage` 字段。如果模型未返回该信息，则无法显示 Token 统计。
+
+### 环境变更提示没有显示？
+
+环境变更提示需要消息中包含 `cwd` 或 `gitBranch` 字段。只有当这些字段发生变化时才会显示提示。
 
 ## 贡献
 

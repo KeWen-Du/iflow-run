@@ -7,6 +7,9 @@ package-lock.json
 .env.local
 .env.*.local
 
+# npm config
+.npmrc
+
 # Logs
 logs
 *.log

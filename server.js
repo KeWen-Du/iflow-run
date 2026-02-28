@@ -7,6 +7,10 @@ const os = require('os');
 
 const app = express();
 
+// 获取当前文件所在目录（用于 npm 全局安装后正确找到静态文件）
+// 在 CommonJS 中 __dirname 是内置变量，但为了兼容 npm 全局安装，我们使用计算后的路径
+const currentDir = path.dirname(require.main.filename || process.mainModule.filename);
+
 // 支持通过环境变量或命令行参数配置
 const args = process.argv.slice(2);
 const PORT = process.env.PORT || process.env.IFLOW_RUN_PORT || args.find(arg => arg.startsWith('--port='))?.split('=')[1] || 3000;
@@ -26,7 +30,7 @@ let projectsCacheTime = 0;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(currentDir, 'public')));
 
 // 读取所有项目
 app.get('/api/projects', async (req, res) => {
@@ -247,6 +251,61 @@ function extractContent(msg) {
   return JSON.stringify(content);
 }
 
-app.listen(PORT, () => {
-  console.log(`iflow-run server running at http://localhost:${PORT}`);
-});
+// 检测端口是否可用
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const net = require('net');
+    const server = net.createServer();
+
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+
+    server.listen(port);
+  });
+}
+
+// 自动查找可用端口
+async function findAvailablePort(startPort) {
+  let port = startPort;
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const available = await isPortAvailable(port);
+    if (available) {
+      return port;
+    }
+    port++;
+    attempts++;
+  }
+
+  throw new Error(`Unable to find available port after ${maxAttempts} attempts`);
+}
+
+// 启动服务器
+(async () => {
+  try {
+    const availablePort = await findAvailablePort(PORT);
+    
+    if (availablePort !== PORT) {
+      console.log(`Port ${PORT} is occupied, using port ${availablePort} instead`);
+    }
+    
+    app.listen(availablePort, () => {
+      console.log(`iflow-run server running at http://localhost:${availablePort}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+})();
