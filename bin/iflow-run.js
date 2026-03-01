@@ -241,5 +241,5 @@ if (stopCommand) {
   // 前台运行
   if (port) process.env.IFLOW_RUN_PORT = port;
   if (dir) process.env.IFLOW_RUN_DIR = dir;
-  require('../server.js');
+  require('../dist/server.js');
 }
