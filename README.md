@@ -17,17 +17,29 @@
 - 🔄 **环境追踪** - 检测并显示工作目录和 Git 分支的变更
 - 📥 **导出功能** - 支持导出会话为 Markdown 或 JSON 格式
 - 📋 **消息目录** - 快速导航到用户消息
+- 📄 **分页加载** - 支持项目列表分页加载，提升大量项目时的性能
+- 🎨 **Markdown 渲染** - 支持 Markdown 格式消息的渲染和代码高亮
+- ⌨️ **键盘快捷键** - 支持键盘快捷键操作，提升使用效率
+- 🔄 **实时更新** - 通过 WebSocket 实时监听会话文件变更
 - 🎨 **现代 UI** - 采用暗色主题和玻璃拟态设计，提供优雅的用户体验
 - 📱 **响应式设计** - 支持桌面端和移动端访问
 
 ## 技术栈
 
-- **后端**: Node.js + Express
+- **后端**: Node.js + Express + TypeScript
 - **前端**: 纯 HTML5 + CSS3 + JavaScript (无框架)
 - **样式**: 自定义 CSS，使用现代暗色主题
-- **依赖**:
-  - express (^4.18.2)
-  - cors (^2.8.5)
+- **主要依赖**:
+  - express (^4.18.2) - Web 服务器框架
+  - cors (^2.8.5) - 跨域资源共享
+  - marked (^17.0.3) - Markdown 解析
+  - highlight.js (^11.9.0) - 代码语法高亮
+  - ws (^8.16.0) - WebSocket 支持
+- **开发工具**:
+  - TypeScript - 类型安全
+  - Vite - 现代化构建工具
+  - ESLint - 代码检查
+  - Prettier - 代码格式化
 
 ## 快速开始
 
@@ -214,11 +226,39 @@ python test_screenshot.py
 
 ## 开发
 
+### 环境要求
+
+- Node.js (v14 或更高版本)
+- npm (随 Node.js 一起安装)
+
+### 开发命令
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm start
+
+# 编译 TypeScript
+npm run build
+
+# 类型检查
+npm run type-check
+
+# 代码检查
+npm run lint
+
+# 代码格式化
+npm run format
+```
+
 ### 代码规范
 
 - **前端**: 使用模块化函数组织代码，采用事件委托处理动态元素
 - **后端**: RESTful API 风格，包含完善的错误处理
 - **样式**: 使用 CSS 变量定义设计令牌，支持主题定制
+- **TypeScript**: 严格模式，完整的类型定义
 
 ### 自定义主题
 
@@ -231,6 +271,24 @@ python test_screenshot.py
   /* 更多颜色变量... */
 }
 ```
+
+### 键盘快捷键
+
+- `Ctrl+K` - 聚焦搜索框
+- `Ctrl+N` - 创建新会话
+- `Ctrl+L` - 刷新列表
+- `Esc` - 关闭当前会话
+
+## API 文档
+
+### 主要端点
+
+- `GET /api/projects` - 获取项目列表（支持分页和搜索）
+- `GET /api/sessions/:projectId/:sessionId` - 获取会话详情
+- `GET /api/search` - 搜索会话消息
+- `WS /ws` - WebSocket 实时更新
+
+详细的 API 文档请参考 [AGENTS.md](./AGENTS.md)
 
 ## 常见问题
 
