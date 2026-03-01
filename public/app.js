@@ -401,7 +401,13 @@ function setupEventListeners() {
 async function loadProjects() {
   try {
     const response = await fetch('/api/projects');
-    projects = await response.json();
+    const data = await response.json();
+    
+    // 兼容新旧 API 格式
+    // 新格式: { projects: [], total, page, limit, totalPages }
+    // 旧格式: []
+    projects = data.projects || data;
+    
     renderProjectsList();
   } catch (error) {
     console.error('Failed to load projects:', error);

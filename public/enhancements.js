@@ -30,7 +30,7 @@ class MarkdownRenderer {
     });
   }
 
-  render(markdown: string): string {
+  render(markdown) {
     try {
       return this.marked.parse(markdown);
     } catch (err) {
@@ -39,14 +39,14 @@ class MarkdownRenderer {
     }
   }
 
-  escapeHtml(text: string): string {
+  escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   }
 
   // 检测是否是 Markdown 格式
-  isMarkdown(text: string): boolean {
+  isMarkdown(text) {
     if (!text) return false;
     const markdownPatterns = [
       /^#{1,6}\s/m,           // 标题
@@ -79,11 +79,11 @@ class KeyboardShortcuts {
     document.addEventListener('keydown', (e) => this.handleKeyDown(e));
   }
 
-  register(key: string, callback: () => void, description: string) {
+  register(key, callback, description) {
     this.shortcuts.set(key, { callback, description });
   }
 
-  handleKeyDown(e: KeyboardEvent) {
+  handleKeyDown(e) {
     // 忽略在输入框中的按键
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
@@ -98,7 +98,7 @@ class KeyboardShortcuts {
     }
   }
 
-  buildKeyString(e: KeyboardEvent): string {
+  buildKeyString(e) {
     const parts: string[] = [];
     if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
     if (e.altKey) parts.push('Alt');
@@ -129,7 +129,7 @@ class WebSocketManager {
     this.listeners = new Map();
   }
 
-  connect(url: string = `ws://${window.location.host}/ws`) {
+  connect(url) {
     try {
       this.ws = new WebSocket(url);
 
@@ -173,14 +173,14 @@ class WebSocketManager {
     }
   }
 
-  on(event: string, callback: (data?: any) => void) {
+  on(event, callback) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
     this.listeners.get(event)!.push(callback);
   }
 
-  emit(event: string, data?: any) {
+  emit(event, data) {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.forEach(callback => callback(data));
@@ -448,7 +448,7 @@ function showShortcutsHelp() {
 // ==================== 工具函数 ====================
 
 // 显示 Toast 通知（如果已存在则使用现有的）
-function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+function showToast(message, type = 'success') {
   if (typeof window.showToast === 'function') {
     window.showToast(message, type);
   } else {

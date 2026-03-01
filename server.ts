@@ -62,7 +62,8 @@ interface SearchResult {
 
 // 全局变量
 const app = express();
-const currentDir = path.dirname(__filename);
+// 修正：从当前目录（项目根目录）而不是 dist 目录查找 public 文件夹
+const currentDir = path.join(__dirname, '..');
 
 // 配置
 const args = process.argv.slice(2);
