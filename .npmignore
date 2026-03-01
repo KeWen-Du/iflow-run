@@ -9,6 +9,21 @@ tool-display-test*.jpg
 AGENTS.md
 TODO.md
 
+# TypeScript 源文件
+*.ts
+!bin/*.js
+tsconfig.json
+vite.config.ts
+
+# ESLint 和 Prettier 配置
+.eslintrc.json
+.prettierrc
+.prettierignore
+
+# 测试文件
+test-features.html
+test.html
+
 # IDE 配置
 .vscode/
 .idea/

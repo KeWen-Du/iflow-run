@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="enhancements.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 </head>
 <body>
   <div class="app">
@@ -198,7 +200,16 @@
     </main>
   </div>
 
+  <!-- WebSocket 状态指示器 -->
+  <div class="ws-status" id="wsStatus" style="display: none;">
+    <div class="ws-status-indicator" id="wsStatusIndicator"></div>
+    <span id="wsStatusText">实时连接</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@17.0.3/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="app.js"></script>
+  <script src="enhancements.js"></script>
 
 <!-- 统计面板模态框 -->
 <div id="statsModal" class="modal">

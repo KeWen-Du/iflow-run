@@ -1,0 +1,313 @@
+/* ==================== 增强功能样式 ==================== */
+
+/* 快捷键帮助面板 */
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.shortcut-item:hover {
+  background: var(--bg-glass);
+  border-color: var(--border-hover);
+  transform: translateX(4px);
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  color: var(--text-primary);
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.shortcut-desc {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Markdown 渲染样式增强 */
+.message-bubble .markdown {
+  line-height: 1.8;
+}
+
+.message-bubble .markdown h1,
+.message-bubble .markdown h2,
+.message-bubble .markdown h3,
+.message-bubble .markdown h4,
+.message-bubble .markdown h5,
+.message-bubble .markdown h6 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.message-bubble .markdown h1 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.message-bubble .markdown h2 {
+  font-size: 1.3em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+}
+
+.message-bubble .markdown h3 {
+  font-size: 1.1em;
+}
+
+.message-bubble .markdown p {
+  margin: 8px 0;
+}
+
+.message-bubble .markdown ul,
+.message-bubble .markdown ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.message-bubble .markdown li {
+  margin: 4px 0;
+}
+
+.message-bubble .markdown ul {
+  list-style-type: disc;
+}
+
+.message-bubble .markdown ol {
+  list-style-type: decimal;
+}
+
+.message-bubble .markdown code {
+  display: inline;
+  padding: 2px 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--accent-primary);
+}
+
+.message-bubble .markdown pre {
+  margin: 12px 0;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.message-bubble .markdown pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.message-bubble .markdown blockquote {
+  margin: 12px 0;
+  padding: 8px 16px;
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 4px solid var(--accent-primary);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.message-bubble .markdown a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.message-bubble .markdown a:hover {
+  color: var(--accent-secondary);
+}
+
+.message-bubble .markdown table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+}
+
+.message-bubble .markdown th,
+.message-bubble .markdown td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.message-bubble .markdown th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.message-bubble .markdown tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.message-bubble .markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.message-bubble .markdown hr {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 分页控件 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-right: 16px;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--bg-glass);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.pagination-select {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pagination-select:hover {
+  border-color: var(--border-hover);
+}
+
+/* WebSocket 连接状态指示器 */
+.ws-status {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ws-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.ws-status-indicator.connected {
+  background: var(--success);
+}
+
+.ws-status-indicator.disconnected {
+  background: var(--danger);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 实时更新提示 */
+.realtime-update-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  margin-left: 8px;
+}
+
+.realtime-update-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
