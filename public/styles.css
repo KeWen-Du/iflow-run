@@ -96,20 +96,26 @@ body {
 }
 
 .projects-list::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
 }
 
 .projects-list::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  margin: 2px;
 }
 
 .projects-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.5) 0%, rgba(139, 92, 246, 0.5) 100%);
+  border-radius: 8px;
+  border: 2px solid var(--bg-tertiary);
+  min-height: 30px;
+  transition: all 0.2s ease;
 }
 
 .projects-list::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%);
+  border-color: var(--accent-primary);
 }
 
 .project-item {
@@ -456,20 +462,30 @@ body {
 }
 
 .messages-container::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
 }
 
 .messages-container::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  margin: 4px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.6) 0%, rgba(139, 92, 246, 0.6) 100%);
+  border-radius: 10px;
+  border: 2px solid var(--bg-tertiary);
+  min-height: 40px;
+  transition: all 0.2s ease;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 100%);
+  border-color: var(--accent-primary);
+}
+
+.messages-container::-webkit-scrollbar-thumb:active {
+  background: var(--accent-gradient);
 }
 
 #loadMoreBtn {
@@ -1006,20 +1022,26 @@ body {
 }
 
 .message-index-list::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
 }
 
 .message-index-list::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  margin: 2px;
 }
 
 .message-index-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.5) 0%, rgba(139, 92, 246, 0.5) 100%);
+  border-radius: 8px;
+  border: 2px solid var(--bg-tertiary);
+  min-height: 30px;
+  transition: all 0.2s ease;
 }
 
 .message-index-list::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%);
+  border-color: var(--accent-primary);
 }
 
 .message-index-item {
@@ -1189,20 +1211,26 @@ body {
 }
 
 .tool-detail-content-box::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .tool-detail-content-box::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  margin: 2px;
 }
 
 .tool-detail-content-box::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.5) 0%, rgba(139, 92, 246, 0.5) 100%);
+  border-radius: 8px;
+  border: 2px solid var(--bg-tertiary);
+  min-height: 30px;
+  transition: all 0.2s ease;
 }
 
 .tool-detail-content-box::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%);
+  border-color: var(--accent-primary);
 }
 
 .tool-detail-meta {
