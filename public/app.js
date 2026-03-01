@@ -940,7 +940,7 @@ function createMessageElement(msg) {
     </div>
     <div class="message-content">
       <div class="message-bubble">
-        ${hasContent ? escapeHtml(content) : ''}
+        ${hasContent ? escapeHtmlWithLineBreaks(content) : ''}
         ${toolCallHTML}
       </div>
       <div class="message-meta">
@@ -1155,6 +1155,23 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// HTML 转义并保留换行符（用于消息内容）
+function escapeHtmlWithLineBreaks(text) {
+  if (text === null || text === undefined) {
+    return '';
+  }
+  const str = String(text);
+  // 先转义 HTML 特殊字符
+  const escaped = str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  // 然后将换行符转换为 br 标签
+  return escaped.replace(/\n/g, '<br>');
 }
 
 // 启动应用
