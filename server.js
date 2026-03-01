@@ -109,7 +109,7 @@ app.get('/api/projects', async (req, res) => {
 
       projects.push({
         id: dirent.name,
-        name: dirent.name.replace(/^-/g, '').replace(/-/g, '\\'),
+        name: dirent.name.replace(/^-/g, ''),
         sessionCount: sessionFiles.length,
         sessions: sessions
       });
@@ -202,7 +202,7 @@ app.get('/api/search', async (req, res) => {
             if (messageContent.toLowerCase().includes(lowerQuery)) {
               results.push({
                 projectId: project.name,
-                projectName: project.name.replace(/^-/g, '').replace(/-/g, '\\'),
+                projectName: project.name,
                 sessionId: sessionId,
                 content: messageContent.substring(0, 200) + (messageContent.length > 200 ? '...' : ''),
                 type: msg.type,
@@ -235,6 +235,50 @@ app.get('/api/search', async (req, res) => {
   } catch (error) {
     console.error('Error searching sessions:', error);
     res.status(500).json({ error: 'Failed to search sessions', message: error.message });
+  }
+});
+
+// 打开项目目录
+app.get('/api/open-directory/:projectId', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const projectPath = path.join(PROJECTS_DIR, projectId);
+
+    // 检查目录是否存在
+    const dirExists = await fs.access(projectPath).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.status(404).json({ error: 'Project directory not found' });
+    }
+
+    // 根据操作系统打开目录
+    const { exec, spawn } = require('child_process');
+
+    if (process.platform === 'win32') {
+      // Windows - 使用 spawn 避免命令行参数问题
+      spawn('explorer.exe', [projectPath], { detached: true });
+      res.json({ success: true, path: projectPath });
+    } else if (process.platform === 'darwin') {
+      // macOS
+      exec(`open "${projectPath}"`, (error) => {
+        if (error) {
+          console.error('Failed to open directory:', error);
+          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
+        }
+        res.json({ success: true, path: projectPath });
+      });
+    } else {
+      // Linux
+      exec(`xdg-open "${projectPath}"`, (error) => {
+        if (error) {
+          console.error('Failed to open directory:', error);
+          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
+        }
+        res.json({ success: true, path: projectPath });
+      });
+    }
+  } catch (error) {
+    console.error('Error opening directory:', error);
+    res.status(500).json({ error: 'Failed to open directory', message: error.message });
   }
 });
 

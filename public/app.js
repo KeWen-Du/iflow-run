@@ -26,6 +26,7 @@ const statsBtn = document.getElementById('statsBtn');
 const themeBtn = document.getElementById('themeBtn');
 const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
 const exportJsonBtn = document.getElementById('exportJsonBtn');
+const openDirectoryBtn = document.getElementById('openDirectoryBtn');
 const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
 const toggleMessageIndexBtn = document.getElementById('toggleMessageIndexBtn');
 const messageIndexPanel = document.getElementById('messageIndexPanel');
@@ -299,6 +300,13 @@ function setupEventListeners() {
   if (exportJsonBtn) {
     exportJsonBtn.addEventListener('click', () => {
       exportAsJson();
+    });
+  }
+
+  // 打开目录功能
+  if (openDirectoryBtn) {
+    openDirectoryBtn.addEventListener('click', () => {
+      openProjectDirectory();
     });
   }
 
@@ -1643,4 +1651,26 @@ window.showToolDetail = function(toolCallId) {
   requestAnimationFrame(() => {
     modal.classList.add('active');
   });
+}
+
+// 打开项目目录
+async function openProjectDirectory() {
+  if (!currentProject) {
+    showToast('没有选中的项目', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/open-directory/${currentProject.id}`);
+    const result = await response.json();
+
+    if (result.success) {
+      showToast('已打开项目目录');
+    } else {
+      showToast(result.error || '打开目录失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to open directory:', error);
+    showToast('打开目录失败', 'error');
+  }
 }
