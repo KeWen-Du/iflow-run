@@ -8,8 +8,8 @@ const os = require('os');
 const app = express();
 
 // 获取当前文件所在目录（用于 npm 全局安装后正确找到静态文件）
-// 在 CommonJS 中 __dirname 是内置变量，但为了兼容 npm 全局安装，我们使用计算后的路径
-const currentDir = path.dirname(require.main.filename || process.mainModule.filename);
+// 使用 __filename 获取 server.js 所在的目录，而不是 require.main.filename
+const currentDir = path.dirname(__filename);
 
 // 支持通过环境变量或命令行参数配置
 const args = process.argv.slice(2);
