@@ -72,6 +72,12 @@
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
+          <button id="settingsBtn" class="btn btn-icon" title="设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -94,6 +100,13 @@
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
             <span id="contextCwdValue" class="context-value">--</span>
+            <button id="openWorkdirBtn" class="btn btn-icon btn-small" title="打开工作目录" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </button>
           </div>
           <div class="context-item" id="contextGitBranch" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="context-icon">
@@ -170,12 +183,11 @@
               </svg>
               打开 iflow
             </button>
-            <button id="openDirectoryBtn" class="btn btn-secondary" title="打开项目目录">
+            <button id="openDirectoryBtn" class="btn btn-secondary" title="打开会话记录文件所在目录">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
-                <polyline points="12 11 17 16 22 11" stroke-linecap="round" stroke-linejoin="round" transform="translate(0, 2)"/>
               </svg>
-              打开目录
+              会话目录
             </button>
             <button id="scrollToBottomBtn" class="btn btn-secondary" title="跳到最后一条消息">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
@@ -311,6 +323,92 @@
           </div>
         </div>
       </div>
+      <!-- 工具使用统计图表 -->
+      <div class="tool-stats-section" style="margin-top: 20px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">🔧 工具使用统计</h3>
+        <div id="toolStatsChart" class="tool-stats-chart">
+          <div style="color: var(--text-muted); text-align: center; padding: 20px;">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置面板模态框 -->
+<div id="settingsModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>⚙️ 设置</h2>
+      <button id="closeSettingsBtn" class="btn btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-section">
+        <h3 class="settings-section-title">外观设置</h3>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>主题模式</span>
+          </label>
+          <select id="settingTheme" class="setting-select">
+            <option value="dark">暗色模式</option>
+            <option value="light">亮色模式</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3 class="settings-section-title">显示设置</h3>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>每页显示项目数</span>
+          </label>
+          <select id="settingPageSize" class="setting-select">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>默认消息筛选</span>
+          </label>
+          <select id="settingDefaultFilter" class="setting-select">
+            <option value="all">全部消息</option>
+            <option value="user">用户消息</option>
+            <option value="assistant">助手消息</option>
+            <option value="tools">工具调用</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3 class="settings-section-title">功能设置</h3>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>自动刷新（WebSocket）</span>
+          </label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="settingAutoRefresh" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>显示工具统计图表</span>
+          </label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="settingShowToolStats" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="resetSettingsBtn" class="btn btn-secondary">恢复默认</button>
+      <button id="saveSettingsBtn" class="btn btn-primary">保存设置</button>
     </div>
   </div>
 </div>

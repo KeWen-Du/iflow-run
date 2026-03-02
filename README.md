@@ -9,37 +9,43 @@
 
 - 📁 **项目管理** - 浏览和查看 iFlow CLI 创建的所有项目
 - 💬 **会话浏览** - 查看每个项目下的所有会话历史
+- ⭐ **会话收藏** - 收藏重要会话，收藏的会话显示在列表顶部 (v1.1.6)
+- 🗑️ **会话删除** - 删除不需要的会话文件 (v1.1.6)
 - 🔍 **消息详情** - 查看完整的对话消息，包括用户消息、助手响应、工具调用和工具结果
 - 👁️ **预览功能** - 快速预览会话的第一条消息内容
 - 📊 **会话上下文** - 显示工作目录、Git 分支、版本信息等环境上下文
 - 🔎 **消息筛选** - 支持按类型筛选消息（用户/助手/工具调用）和内容搜索
 - 💰 **Token 统计** - 显示模型名称、Token 消耗、执行时间和预估成本
+- 📈 **工具使用统计** - 可视化展示工具调用次数统计图表 (v1.1.6)
 - 🔄 **环境追踪** - 检测并显示工作目录和 Git 分支的变更
 - 📥 **导出功能** - 支持导出会话为 Markdown 或 JSON 格式
 - 📋 **消息目录** - 快速导航到用户消息
+- ⚙️ **用户设置面板** - 自定义主题、显示数量、默认筛选等偏好设置 (v1.1.6)
 - 📄 **分页加载** - 支持项目列表分页加载，提升大量项目时的性能
 - 🎨 **Markdown 渲染** - 支持 Markdown 格式消息的渲染和代码高亮
 - ⌨️ **键盘快捷键** - 支持键盘快捷键操作，提升使用效率
 - 🔄 **实时更新** - 通过 WebSocket 实时监听会话文件变更
-- 🎨 **现代 UI** - 采用暗色主题和玻璃拟态设计，提供优雅的用户体验
+- 🎨 **现代 UI** - 采用 "Digital Currents (数字流光)" 设计理念，支持暗色/亮色主题切换
 - 📱 **响应式设计** - 支持桌面端和移动端访问
 
 ## 技术栈
 
 - **后端**: Node.js + Express + TypeScript
 - **前端**: 纯 HTML5 + CSS3 + JavaScript (无框架)
-- **样式**: 自定义 CSS，使用现代暗色主题
+- **样式**: 自定义 CSS，采用 "Digital Currents" 设计系统，支持暗色/亮色主题
+- **模块系统**: CommonJS
 - **主要依赖**:
   - express (^4.18.2) - Web 服务器框架
   - cors (^2.8.5) - 跨域资源共享
   - marked (^17.0.3) - Markdown 解析
-  - highlight.js (^11.9.0) - 代码语法高亮
-  - ws (^8.16.0) - WebSocket 支持
+  - highlight.js (^11.11.1) - 代码语法高亮
+  - ws (^8.19.0) - WebSocket 支持
 - **开发工具**:
-  - TypeScript - 类型安全
-  - Vite - 现代化构建工具
-  - ESLint - 代码检查
-  - Prettier - 代码格式化
+  - TypeScript (5.9.3) - 类型安全
+  - Vite (7.3.1) - 现代化构建工具
+  - ESLint (10.0.2) - 代码检查
+  - Prettier (3.8.1) - 代码格式化
+  - tsx (4.19.2) - TypeScript 执行和监视工具
 
 ## 快速开始
 
@@ -107,16 +113,29 @@ npx iflow-run
 ```
 iflow-run/
 ├── server.js              # Express 服务器
+├── server.ts              # TypeScript 源文件
 ├── package.json           # 项目配置
+├── tsconfig.json          # TypeScript 配置
+├── vite.config.ts         # Vite 配置
 ├── bin/                   # 全局可执行文件
 │   └── iflow-run.js      # CLI 入口文件
+├── dist/                  # TypeScript 编译输出
+│   └── server.js         # 编译后的服务器文件
+├── docs/                  # 项目文档
+│   └── PROJECT_PLAN.md   # 项目规划文档
 ├── public/                # 前端静态文件
 │   ├── index.html         # 主页面
 │   ├── app.js             # 前端逻辑
+│   ├── enhancements.js    # 扩展功能模块
 │   ├── styles.css         # 样式文件
-│   └── test.html          # 测试页面
+│   └── enhancements.css   # 扩展功能样式
 └── test_screenshot.py     # 自动化测试脚本
 ```
+
+## 相关文档
+
+- **[AGENTS.md](./AGENTS.md)** - 详细的项目说明、API 文档和开发约定
+- **[PROJECT_PLAN.md](./docs/PROJECT_PLAN.md)** - 项目规划文档，包含功能分析和版本计划
 
 ## API 接口
 
@@ -135,6 +154,49 @@ GET /api/sessions/:projectId/:sessionId
 ```
 
 返回指定会话的完整消息记录。
+
+### 删除会话 (v1.1.6)
+
+```http
+DELETE /api/sessions/:projectId/:sessionId
+```
+
+删除指定的会话文件。
+
+响应示例：
+```json
+{
+  "success": true,
+  "message": "Session deleted successfully"
+}
+```
+
+### 获取统计数据 (v1.1.6)
+
+```http
+GET /api/stats
+```
+
+返回所有项目的统计数据，包括工具使用统计。
+
+响应示例：
+```json
+{
+  "totalProjects": 10,
+  "totalSessions": 50,
+  "totalMessages": 1000,
+  "totalToolCalls": 500,
+  "totalInputTokens": 50000,
+  "totalOutputTokens": 25000,
+  "totalTokens": 75000,
+  "estimatedCost": 0.1,
+  "toolUsageStats": {
+    "read_file": 100,
+    "write_file": 50,
+    "run_shell_command": 80
+  }
+}
+```
 
 ### 搜索会话
 
@@ -240,8 +302,17 @@ npm install
 # 启动开发服务器
 npm start
 
-# 编译 TypeScript
+# 开发模式（热重载）
+npm run dev:watch
+
+# 完整构建（服务器 + 前端）
 npm run build
+
+# 仅构建服务器
+npm run build:server
+
+# 仅构建前端
+npm run build:frontend
 
 # 类型检查
 npm run type-check
@@ -249,8 +320,17 @@ npm run type-check
 # 代码检查
 npm run lint
 
+# 代码检查并修复
+npm run lint:fix
+
 # 代码格式化
 npm run format
+
+# 运行测试
+npm test
+
+# E2E 测试
+npm run test:e2e
 ```
 
 ### 代码规范
@@ -274,10 +354,11 @@ npm run format
 
 ### 键盘快捷键
 
-- `Ctrl+K` - 聚焦搜索框
-- `Ctrl+N` - 创建新会话
-- `Ctrl+L` - 刷新列表
-- `Esc` - 关闭当前会话
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl/Cmd + K` | 快速搜索 |
+| `Esc` | 关闭模态框/返回 |
+| `Ctrl/Cmd + R` | 刷新项目列表 |
 
 ## API 文档
 
@@ -291,6 +372,21 @@ npm run format
 详细的 API 文档请参考 [AGENTS.md](./AGENTS.md)
 
 ## 更新日志
+
+### v1.1.6 (2026-03-03)
+
+**新功能**
+- ⭐ **会话收藏功能** - 点击星形按钮收藏重要会话，收藏的会话显示星标并排在列表顶部
+- 🗑️ **会话删除功能** - 点击删除按钮删除不需要的会话，带确认对话框防止误操作
+- ⚙️ **用户设置面板** - 支持主题模式（暗色/亮色）、每页显示数量、默认消息筛选、自动刷新等设置
+- 📈 **工具使用统计图表** - 在统计面板中展示 Top 10 工具调用统计，可视化展示使用频率
+- 🔌 **后端统计 API** - 新增 `/api/stats` 接口，提供完整统计数据和工具使用统计，优化前端加载性能
+- 🗑️ **会话删除 API** - 新增 `DELETE /api/sessions/:projectId/:sessionId` 接口，支持删除会话文件
+
+**优化**
+- 统计面板改用后端 API，提升大数据量下的加载速度
+- 收藏状态使用 localStorage 持久化存储
+- 设置面板支持保存和恢复默认设置
 
 ### v1.1.5 (2026-03-02)
 

@@ -13,6 +13,79 @@ let isLoadingMore = false;
 let messageFilter = 'all'; // 消息类型筛选：all, user, assistant, tools
 let currentSearchQuery = ''; // 当前搜索查询
 
+// ==================== 会话收藏功能 ====================
+const FAVORITES_KEY = 'iflow-run-favorites';
+
+// 获取收藏列表
+function getFavorites() {
+  try {
+    const favorites = localStorage.getItem(FAVORITES_KEY);
+    return favorites ? JSON.parse(favorites) : [];
+  } catch {
+    return [];
+  }
+}
+
+// 检查会话是否已收藏
+function isFavorite(projectId, sessionId) {
+  const favorites = getFavorites();
+  return favorites.some(f => f.projectId === projectId && f.sessionId === sessionId);
+}
+
+// 添加收藏
+function addFavorite(projectId, sessionId, preview) {
+  const favorites = getFavorites();
+  if (!isFavorite(projectId, sessionId)) {
+    favorites.push({ projectId, sessionId, preview, addedAt: Date.now() });
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    showToast('已收藏此会话');
+  }
+}
+
+// 移除收藏
+function removeFavorite(projectId, sessionId) {
+  let favorites = getFavorites();
+  favorites = favorites.filter(f => !(f.projectId === projectId && f.sessionId === sessionId));
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  showToast('已取消收藏');
+}
+
+// 切换收藏状态
+function toggleFavorite(projectId, sessionId, preview) {
+  if (isFavorite(projectId, sessionId)) {
+    removeFavorite(projectId, sessionId);
+    return false;
+  } else {
+    addFavorite(projectId, sessionId, preview);
+    return true;
+  }
+}
+
+// ==================== 用户设置功能 ====================
+const SETTINGS_KEY = 'iflow-run-settings';
+const DEFAULT_SETTINGS = {
+  theme: 'dark',
+  pageSize: 20,
+  autoRefresh: true,
+  showToolStats: true,
+  defaultMessageFilter: 'all'
+};
+
+// 获取用户设置
+function getUserSettings() {
+  try {
+    const settings = localStorage.getItem(SETTINGS_KEY);
+    return settings ? { ...DEFAULT_SETTINGS, ...JSON.parse(settings) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+// 保存用户设置
+function saveUserSettings(settings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
 // DOM 元素
 const sidebar = document.getElementById('sidebar');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
@@ -30,6 +103,7 @@ const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
 const exportJsonBtn = document.getElementById('exportJsonBtn');
 const openIflowBtn = document.getElementById('openIflowBtn');
 const openDirectoryBtn = document.getElementById('openDirectoryBtn');
+const openWorkdirBtn = document.getElementById('openWorkdirBtn');
 const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
 const toggleMessageIndexBtn = document.getElementById('toggleMessageIndexBtn');
 const messageIndexPanel = document.getElementById('messageIndexPanel');
@@ -334,6 +408,13 @@ function setupEventListeners() {
     });
   }
 
+  // 打开工作目录功能
+  if (openWorkdirBtn) {
+    openWorkdirBtn.addEventListener('click', () => {
+      openWorkingDirectory();
+    });
+  }
+
   // 跳到底部功能
   if (scrollToBottomBtn) {
     scrollToBottomBtn.addEventListener('click', () => {
@@ -418,6 +499,9 @@ function setupEventListeners() {
       }
     });
   }
+
+  // 初始化设置面板
+  initSettingsPanel();
 }
 
 // 加载项目列表
@@ -515,7 +599,7 @@ function renderSessionsList() {
   }
 
   // 根据搜索查询过滤会话
-  const filteredSessions = currentProject.sessions.filter(session => {
+  let filteredSessions = currentProject.sessions.filter(session => {
     if (!searchQuery) return true;
 
     const searchText = searchQuery.toLowerCase();
@@ -523,6 +607,16 @@ function renderSessionsList() {
     const matchPreview = session.preview.toLowerCase().includes(searchText);
 
     return matchId || matchPreview;
+  });
+
+  // 将收藏的会话排在前面
+  const favorites = getFavorites();
+  filteredSessions = filteredSessions.sort((a, b) => {
+    const aIsFav = favorites.some(f => f.projectId === currentProject.id && f.sessionId === a.id);
+    const bIsFav = favorites.some(f => f.projectId === currentProject.id && f.sessionId === b.id);
+    if (aIsFav && !bIsFav) return -1;
+    if (!aIsFav && bIsFav) return 1;
+    return 0;
   });
 
   if (filteredSessions.length === 0) {
@@ -540,17 +634,89 @@ function renderSessionsList() {
 
   sessionsContainer.innerHTML = `
     <div class="sessions-grid">
-      ${filteredSessions.map(session => `
-        <div class="session-card" data-session-id="${session.id}">
+      ${filteredSessions.map(session => {
+        const isFav = isFavorite(currentProject.id, session.id);
+        return `
+        <div class="session-card ${isFav ? 'favorite' : ''}" data-session-id="${session.id}">
           <div class="session-card-header">
             <div class="session-id">${session.id}</div>
             <div class="session-time">${formatTime(session.mtime)}</div>
           </div>
           <div class="session-preview">${escapeHtml(session.preview)}</div>
+          <div class="session-card-actions">
+            <button class="btn btn-icon btn-small favorite-btn ${isFav ? 'active' : ''}" 
+                    data-session-id="${session.id}" 
+                    data-preview="${escapeHtml(session.preview.substring(0, 50))}"
+                    title="${isFav ? '取消收藏' : '收藏此会话'}">
+              ${isFav ? '⭐' : '☆'}
+            </button>
+            <button class="btn btn-icon btn-small delete-btn" 
+                    data-session-id="${session.id}"
+                    title="删除此会话">
+              🗑️
+            </button>
+          </div>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>
   `;
+
+  // 添加收藏和删除按钮事件监听
+  sessionsContainer.querySelectorAll('.favorite-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sessionId = btn.dataset.sessionId;
+      const preview = btn.dataset.preview;
+      const newState = toggleFavorite(currentProject.id, sessionId, preview);
+      btn.classList.toggle('active', newState);
+      btn.textContent = newState ? '⭐' : '☆';
+      btn.title = newState ? '取消收藏' : '收藏此会话';
+      btn.closest('.session-card').classList.toggle('favorite', newState);
+      // 重新排序
+      setTimeout(() => renderSessionsList(), 100);
+    });
+  });
+
+  sessionsContainer.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const sessionId = btn.dataset.sessionId;
+      if (confirm(`确定要删除会话 "${sessionId}" 吗？此操作不可恢复。`)) {
+        await deleteSession(currentProject.id, sessionId);
+      }
+    });
+  });
+}
+
+// 删除会话
+async function deleteSession(projectId, sessionId) {
+  try {
+    const response = await fetch(`/api/sessions/${projectId}/${sessionId}`, {
+      method: 'DELETE'
+    });
+    const result = await response.json();
+
+    if (result.success) {
+      showToast('会话已删除');
+      // 从当前项目会话列表中移除
+      if (currentProject) {
+        currentProject.sessions = currentProject.sessions.filter(s => s.id !== sessionId);
+        currentProject.sessionCount = currentProject.sessions.length;
+        // 如果删除的是当前查看的会话，返回列表
+        if (currentSession && currentSession.id === sessionId) {
+          sessionDetail.classList.add('hidden');
+          sessionsContainer.classList.remove('hidden');
+          currentSession = null;
+        }
+        renderSessionsList();
+      }
+    } else {
+      showToast(result.error || '删除失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to delete session:', error);
+    showToast('删除失败', 'error');
+  }
 }
 
 // 加载会话详情
@@ -604,6 +770,11 @@ function updateSessionContext(messages) {
   if (cwdValue) {
     cwdValue.textContent = cwd || '未知目录';
     cwdValue.title = cwd || '未知目录';
+  }
+
+  // 显示/隐藏打开工作目录按钮
+  if (openWorkdirBtn) {
+    openWorkdirBtn.style.display = cwd ? 'flex' : 'none';
   }
 
   // 提取 Git 分支
@@ -1086,9 +1257,7 @@ function addLoadMoreButton() {
   if (!loadMoreBtn) {
     loadMoreBtn = document.createElement('button');
     loadMoreBtn.id = 'loadMoreBtn';
-    loadMoreBtn.className = 'btn btn-secondary';
-    loadMoreBtn.style.margin = '20px auto';
-    loadMoreBtn.style.display = 'block';
+    loadMoreBtn.className = 'btn btn-secondary load-more-btn';
     loadMoreBtn.textContent = `加载更多 (${allMessages.length - loadedMessageCount} 条消息)`;
     loadMoreBtn.onclick = () => loadMoreMessages(LOAD_MORE_COUNT);
     messagesContainer.appendChild(loadMoreBtn);
@@ -1218,6 +1387,110 @@ function escapeHtmlWithLineBreaks(text) {
   return escaped.replace(/\n/g, '<br>');
 }
 
+// ==================== 设置面板功能 ====================
+
+// 显示设置面板
+function showSettingsModal() {
+  const settingsModalEl = document.getElementById('settingsModal');
+  if (!settingsModalEl) return;
+
+  // 加载当前设置
+  const settings = getUserSettings();
+
+  // 填充设置值
+  const themeSelect = document.getElementById('settingTheme');
+  const pageSizeSelect = document.getElementById('settingPageSize');
+  const defaultFilterSelect = document.getElementById('settingDefaultFilter');
+  const autoRefreshCheck = document.getElementById('settingAutoRefresh');
+  const showToolStatsCheck = document.getElementById('settingShowToolStats');
+
+  if (themeSelect) themeSelect.value = settings.theme;
+  if (pageSizeSelect) pageSizeSelect.value = settings.pageSize;
+  if (defaultFilterSelect) defaultFilterSelect.value = settings.defaultMessageFilter;
+  if (autoRefreshCheck) autoRefreshCheck.checked = settings.autoRefresh;
+  if (showToolStatsCheck) showToolStatsCheck.checked = settings.showToolStats;
+
+  // 显示模态框
+  settingsModalEl.classList.add('active');
+}
+
+// 关闭设置面板
+function closeSettingsModal() {
+  const settingsModalEl = document.getElementById('settingsModal');
+  if (settingsModalEl) {
+    settingsModalEl.classList.remove('active');
+  }
+}
+
+// 保存设置
+function saveSettings() {
+  const themeSelect = document.getElementById('settingTheme');
+  const pageSizeSelect = document.getElementById('settingPageSize');
+  const defaultFilterSelect = document.getElementById('settingDefaultFilter');
+  const autoRefreshCheck = document.getElementById('settingAutoRefresh');
+  const showToolStatsCheck = document.getElementById('settingShowToolStats');
+
+  const settings = {
+    theme: themeSelect?.value || 'dark',
+    pageSize: parseInt(pageSizeSelect?.value || '20'),
+    defaultMessageFilter: defaultFilterSelect?.value || 'all',
+    autoRefresh: autoRefreshCheck?.checked !== false,
+    showToolStats: showToolStatsCheck?.checked !== false
+  };
+
+  saveUserSettings(settings);
+
+  // 应用主题
+  if (settings.theme === 'light') {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+
+  showToast('设置已保存');
+  closeSettingsModal();
+}
+
+// 重置设置
+function resetSettings() {
+  localStorage.removeItem(SETTINGS_KEY);
+  showToast('设置已恢复默认');
+  showSettingsModal(); // 重新加载默认设置
+}
+
+// 初始化设置面板事件监听
+function initSettingsPanel() {
+  const settingsBtn = document.getElementById('settingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+  const settingsModalEl = document.getElementById('settingsModal');
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', showSettingsModal);
+  }
+
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', closeSettingsModal);
+  }
+
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveSettings);
+  }
+
+  if (resetSettingsBtn) {
+    resetSettingsBtn.addEventListener('click', resetSettings);
+  }
+
+  if (settingsModalEl) {
+    settingsModalEl.addEventListener('click', (e) => {
+      if (e.target === settingsModalEl) {
+        closeSettingsModal();
+      }
+    });
+  }
+}
+
 // 启动应用
 init();
 
@@ -1231,47 +1504,7 @@ async function showStatsModal() {
       return;
     }
 
-    // 计算统计数据
-    let totalSessions = 0;
-    let totalMessages = 0;
-    let totalToolCalls = 0;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-
-    for (const project of projects) {
-      totalSessions += project.sessionCount;
-
-      // 获取每个会话的消息数量和工具调用次数
-      for (const session of project.sessions) {
-        try {
-          const response = await fetch(`/api/sessions/${project.id}/${session.id}`);
-          const messages = await response.json();
-          totalMessages += messages.length;
-
-          // 计算工具调用次数和 Token 消耗
-          messages.forEach(msg => {
-            if (msg.message?.content && Array.isArray(msg.message.content)) {
-              const toolCalls = msg.message.content.filter(c => c.type === 'tool_use');
-              totalToolCalls += toolCalls.length;
-            }
-
-            // 计算 Token 消耗
-            if (msg.message?.usage) {
-              totalInputTokens += msg.message.usage.input_tokens || 0;
-              totalOutputTokens += msg.message.usage.output_tokens || 0;
-            }
-          });
-        } catch (err) {
-          console.error('Error loading session for stats:', err);
-        }
-      }
-    }
-
-    const totalTokens = totalInputTokens + totalOutputTokens;
-    // 预估成本（假设输入 $0.001/1K tokens，输出 $0.002/1K tokens）
-    const estimatedCost = (totalInputTokens * 0.001 / 1000) + (totalOutputTokens * 0.002 / 1000);
-
-    // 更新统计数据
+    // 显示加载状态
     const totalProjectsEl = document.getElementById('totalProjects');
     const totalSessionsEl = document.getElementById('totalSessions');
     const totalMessagesEl = document.getElementById('totalMessages');
@@ -1281,20 +1514,72 @@ async function showStatsModal() {
     const totalOutputTokensEl = document.getElementById('totalOutputTokens');
     const estimatedCostEl = document.getElementById('estimatedCost');
 
-    if (totalProjectsEl) totalProjectsEl.textContent = projects.length;
-    if (totalSessionsEl) totalSessionsEl.textContent = totalSessions;
-    if (totalMessagesEl) totalMessagesEl.textContent = totalMessages;
-    if (totalToolCallsEl) totalToolCallsEl.textContent = totalToolCalls;
-    if (totalTokensEl) totalTokensEl.textContent = totalTokens.toLocaleString();
-    if (totalInputTokensEl) totalInputTokensEl.textContent = totalInputTokens.toLocaleString();
-    if (totalOutputTokensEl) totalOutputTokensEl.textContent = totalOutputTokens.toLocaleString();
-    if (estimatedCostEl) estimatedCostEl.textContent = `$${estimatedCost.toFixed(2)}`;
+    // 设置加载状态
+    if (totalProjectsEl) totalProjectsEl.textContent = '...';
+    if (totalSessionsEl) totalSessionsEl.textContent = '...';
+    if (totalMessagesEl) totalMessagesEl.textContent = '...';
+    if (totalToolCallsEl) totalToolCallsEl.textContent = '...';
+    if (totalTokensEl) totalTokensEl.textContent = '...';
+    if (totalInputTokensEl) totalInputTokensEl.textContent = '...';
+    if (totalOutputTokensEl) totalOutputTokensEl.textContent = '...';
+    if (estimatedCostEl) estimatedCostEl.textContent = '...';
 
     // 显示模态框
     statsModalEl.classList.add('active');
+
+    // 调用后端统计 API
+    const response = await fetch('/api/stats');
+    const stats = await response.json();
+
+    // 更新统计数据
+    if (totalProjectsEl) totalProjectsEl.textContent = stats.totalProjects;
+    if (totalSessionsEl) totalSessionsEl.textContent = stats.totalSessions;
+    if (totalMessagesEl) totalMessagesEl.textContent = stats.totalMessages;
+    if (totalToolCallsEl) totalToolCallsEl.textContent = stats.totalToolCalls;
+    if (totalTokensEl) totalTokensEl.textContent = stats.totalTokens?.toLocaleString() || '0';
+    if (totalInputTokensEl) totalInputTokensEl.textContent = stats.totalInputTokens?.toLocaleString() || '0';
+    if (totalOutputTokensEl) totalOutputTokensEl.textContent = stats.totalOutputTokens?.toLocaleString() || '0';
+    if (estimatedCostEl) estimatedCostEl.textContent = `$${(stats.estimatedCost || 0).toFixed(4)}`;
+
+    // 更新工具使用统计图表
+    updateToolStatsChart(stats.toolUsageStats || {});
   } catch (error) {
     console.error('Error loading stats:', error);
+    showToast('加载统计数据失败', 'error');
   }
+}
+
+// 更新工具使用统计图表
+function updateToolStatsChart(toolStats) {
+  const chartContainer = document.getElementById('toolStatsChart');
+  if (!chartContainer) return;
+
+  const entries = Object.entries(toolStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  
+  if (entries.length === 0) {
+    chartContainer.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">暂无工具使用数据</div>';
+    return;
+  }
+
+  const maxCount = Math.max(...entries.map(e => e[1]));
+  
+  chartContainer.innerHTML = entries.map(([tool, count]) => {
+    const config = TOOL_CONFIG[tool] || { icon: '🔧', name: tool, color: '#6b7280' };
+    const percentage = (count / maxCount * 100).toFixed(0);
+    
+    return `
+      <div class="tool-stat-item">
+        <div class="tool-stat-header">
+          <span class="tool-stat-icon">${config.icon}</span>
+          <span class="tool-stat-name">${config.name}</span>
+          <span class="tool-stat-count">${count} 次</span>
+        </div>
+        <div class="tool-stat-bar">
+          <div class="tool-stat-bar-fill" style="width: ${percentage}%; background: ${config.color};"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // 导出为 Markdown
@@ -1635,7 +1920,7 @@ window.showToolDetail = function(toolCallId) {
           </div>
         </div>
       </div>
-      <div class="modal-actions" style="max-width: 400px; margin: 0 auto;">
+      <div class="modal-actions">
         <button class="btn btn-secondary copy-detail-params" data-tool-id="${toolCallId}">
           📋 复制参数
         </button>
@@ -1644,7 +1929,7 @@ window.showToolDetail = function(toolCallId) {
           📋 复制结果
         </button>
         ` : ''}
-        <button class="btn close-tool-detail-btn" style="background: var(--accent-gradient); color: white;">
+        <button class="btn btn-primary close-tool-detail-btn">
           关闭
         </button>
       </div>
@@ -1701,12 +1986,34 @@ async function openProjectDirectory() {
     const result = await response.json();
 
     if (result.success) {
-      showToast('已打开项目目录');
+      showToast('已打开会话目录');
     } else {
       showToast(result.error || '打开目录失败', 'error');
     }
   } catch (error) {
     console.error('Failed to open directory:', error);
+    showToast('打开目录失败', 'error');
+  }
+}
+
+// 打开工作目录
+async function openWorkingDirectory() {
+  if (!currentProject || !currentSession) {
+    showToast('没有选中的会话', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/open-workdir/${currentProject.id}/${currentSession.id}`);
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`已打开 ${result.path}`);
+    } else {
+      showToast(result.error || '打开目录失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to open working directory:', error);
     showToast('打开目录失败', 'error');
   }
 }

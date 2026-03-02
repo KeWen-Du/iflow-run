@@ -417,6 +417,69 @@ app.get('/api/open-directory/:projectId', async (req: Request, res: Response) =>
   }
 });
 
+// 打开会话的工作目录
+app.get('/api/open-workdir/:projectId/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.params;
+    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+
+    const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
+    if (!fileExists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // 读取会话文件获取工作目录
+    const content = await fs.readFile(sessionFile, 'utf8');
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    // 从第一条用户消息中获取 cwd
+    let workingDir: string | null = null;
+    for (const line of lines) {
+      const msg: Message = JSON.parse(line);
+      if (msg.type === 'user' && msg.cwd) {
+        workingDir = msg.cwd;
+        break;
+      }
+    }
+
+    if (!workingDir) {
+      return res.status(400).json({ error: 'No working directory found in session' });
+    }
+
+    // 检查工作目录是否存在
+    const dirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+    }
+
+    const { exec, spawn } = require('child_process');
+
+    if (process.platform === 'win32') {
+      spawn('explorer.exe', [workingDir], { detached: true });
+      res.json({ success: true, path: workingDir });
+    } else if (process.platform === 'darwin') {
+      exec(`open "${workingDir}"`, (error: Error | null) => {
+        if (error) {
+          console.error('Failed to open working directory:', error);
+          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
+        }
+        res.json({ success: true, path: workingDir });
+      });
+    } else {
+      exec(`xdg-open "${workingDir}"`, (error: Error | null) => {
+        if (error) {
+          console.error('Failed to open working directory:', error);
+          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
+        }
+        res.json({ success: true, path: workingDir });
+      });
+    }
+  } catch (error) {
+    console.error('Error opening working directory:', error);
+    res.status(500).json({ error: 'Failed to open directory', message: (error as Error).message });
+  }
+});
+
 // 在项目的工作目录打开终端并执行 iflow（从最新会话获取工作目录）
 app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response) => {
   try {
@@ -620,6 +683,132 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
   } catch (error) {
     console.error('Error opening iflow:', error);
     res.status(500).json({ error: 'Failed to open iflow', message: (error as Error).message });
+  }
+});
+
+// 获取统计数据 API
+app.get('/api/stats', async (req: Request, res: Response) => {
+  try {
+    const dirExists = await fs.access(PROJECTS_DIR).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.json({
+        totalProjects: 0,
+        totalSessions: 0,
+        totalMessages: 0,
+        totalToolCalls: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        toolUsageStats: {}
+      });
+    }
+
+    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
+    let totalSessions = 0;
+    let totalMessages = 0;
+    let totalToolCalls = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const toolUsageStats: Record<string, number> = {};
+
+    for (const project of entries) {
+      if (!project.isDirectory()) continue;
+
+      const projectPath = path.join(PROJECTS_DIR, project.name);
+      const files = await fs.readdir(projectPath);
+      const sessionFiles = files.filter(file => file.startsWith('session-') && file.endsWith('.jsonl'));
+
+      totalSessions += sessionFiles.length;
+
+      for (const file of sessionFiles) {
+        const sessionFile = path.join(projectPath, file);
+        try {
+          const content = await fs.readFile(sessionFile, 'utf8');
+          const lines = content.split('\n').filter(line => line.trim());
+
+          for (const line of lines) {
+            try {
+              const msg: Message = JSON.parse(line);
+              totalMessages++;
+
+              // 计算工具调用
+              if (msg.message?.content && Array.isArray(msg.message.content)) {
+                const toolCalls = msg.message.content.filter(c => c.type === 'tool_use');
+                totalToolCalls += toolCalls.length;
+
+                // 统计各工具使用次数
+                toolCalls.forEach(tc => {
+                  if (tc.name) {
+                    toolUsageStats[tc.name] = (toolUsageStats[tc.name] || 0) + 1;
+                  }
+                });
+              }
+
+              // 计算 Token 消耗
+              if (msg.message?.usage) {
+                totalInputTokens += msg.message.usage.input_tokens || 0;
+                totalOutputTokens += msg.message.usage.output_tokens || 0;
+              }
+            } catch {
+              // 跳过解析错误的消息
+            }
+          }
+        } catch {
+          // 跳过无法读取的文件
+        }
+      }
+    }
+
+    const totalTokens = totalInputTokens + totalOutputTokens;
+    const estimatedCost = (totalInputTokens * 0.001 / 1000) + (totalOutputTokens * 0.002 / 1000);
+
+    res.json({
+      totalProjects: entries.filter(e => e.isDirectory()).length,
+      totalSessions,
+      totalMessages,
+      totalToolCalls,
+      totalInputTokens,
+      totalOutputTokens,
+      totalTokens,
+      estimatedCost,
+      toolUsageStats
+    });
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.status(500).json({ error: 'Failed to get stats', message: (error as Error).message });
+  }
+});
+
+// 删除会话 API
+app.delete('/api/sessions/:projectId/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.params;
+    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+
+    // 检查文件是否存在
+    const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
+    if (!fileExists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // 删除文件
+    await fs.unlink(sessionFile);
+
+    // 清除缓存
+    projectsCache = null;
+    projectsCacheTime = 0;
+
+    // 通知客户端
+    broadcast({
+      type: 'session_deleted',
+      projectId,
+      sessionId,
+      timestamp: Date.now()
+    });
+
+    res.json({ success: true, message: 'Session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    res.status(500).json({ error: 'Failed to delete session', message: (error as Error).message });
   }
 });
 

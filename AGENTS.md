@@ -4,9 +4,40 @@
 
 - **GitHub**: https://github.com/KeWen-Du/iflow-run
 - **npm**: https://www.npmjs.com/package/iflow-run
-- **版本**: 1.1.4
+- **版本**: 1.1.6
 - **作者**: dukewen <dukewen666@gmail.com>
 - **许可证**: MIT
+
+## 更新日志
+
+### v1.1.6 (2026-03-03)
+
+**新功能**
+- ⭐ **会话收藏功能** - 点击星形按钮收藏重要会话，收藏的会话显示星标并排在列表顶部
+- 🗑️ **会话删除功能** - 点击删除按钮删除不需要的会话，带确认对话框防止误操作
+- ⚙️ **用户设置面板** - 支持主题模式（暗色/亮色）、每页显示数量、默认消息筛选、自动刷新等设置
+- 📈 **工具使用统计图表** - 在统计面板中展示 Top 10 工具调用统计，可视化展示使用频率
+- 🔌 **后端统计 API** - 新增 `/api/stats` 接口，提供完整统计数据和工具使用统计，优化前端加载性能
+- 🗑️ **会话删除 API** - 新增 `DELETE /api/sessions/:projectId/:sessionId` 接口，支持删除会话文件
+
+**优化**
+- 统计面板改用后端 API，提升大数据量下的加载速度
+- 收藏状态使用 localStorage 持久化存储
+- 设置面板支持保存和恢复默认设置
+
+### v1.1.5 (2026-03-02)
+
+**新功能**
+- 侧边栏收起/展开功能，点击按钮可收起侧边栏，状态自动保存
+- 会话详情页新增"打开 iflow"按钮，可在会话工作目录打开终端并执行 iflow
+- 项目列表新增"打开 iflow"按钮（悬停显示），可直接从项目列表打开 iflow
+- 新增 API 端点 `/api/open-iflow/:projectId/:sessionId` 和 `/api/open-iflow-project/:projectId`
+- 打开 iflow 功能支持 Windows、macOS、Linux 多平台
+
+**优化**
+- 侧边栏宽度从 320px 调整为 280px，收起后宽度 48px
+- 项目列表项布局优化，使用 flex 布局支持按钮显示
+- 添加 CSS 过渡动画，提升用户体验
 
 ## 项目概述
 
@@ -16,6 +47,8 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 
 - **项目管理**: 浏览和查看 iFlow CLI 创建的所有项目
 - **会话浏览**: 查看每个项目下的所有会话历史
+- **会话收藏**: 收藏重要会话，收藏的会话显示在列表顶部 ⭐ NEW
+- **会话删除**: 删除不需要的会话文件 🗑️ NEW
 - **消息详情**: 查看完整的对话消息，包括用户消息、助手响应、工具调用和工具结果
 - **预览功能**: 快速预览会话的第一条消息内容
 - **会话上下文**: 显示工作目录、Git 分支、版本信息等环境上下文
@@ -23,11 +56,14 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 - **消息内搜索**: 在会话详情中搜索消息内容
 - **Token 统计**: 显示模型名称、Token 消耗、执行时间和预估成本
 - **使用统计**: 统计面板显示项目、会话、消息、工具调用和 Token 消耗总量
+- **工具使用统计**: 可视化展示工具调用次数统计图表 📊 NEW
 - **环境追踪**: 检测并显示工作目录和 Git 分支的变更
 - **导出功能**: 支持导出会话为 Markdown 或 JSON 格式
 - **消息目录**: 快速导航到用户消息
 - **打开 iflow**: 在会话工作目录打开终端并执行 iflow 命令
 - **打开目录**: 在系统文件管理器中打开项目目录
+- **打开工作目录**: 在系统文件管理器中打开会话的工作目录
+- **用户设置面板**: 自定义主题、显示数量、默认筛选等偏好设置 ⚙️ NEW
 - **跳转底部**: 快速跳转到最后一条消息
 - **后台运行**: 支持后台运行服务，方便长期使用
 - **端口自动检测**: 自动检测端口占用并使用下一个可用端口
@@ -43,11 +79,11 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 - **样式**: 自定义 CSS，使用现代暗色主题设计
 - **模块系统**: CommonJS
 - **开发工具**:
-  - TypeScript - 类型安全的 JavaScript 超集
-  - Vite - 现代化的前端构建工具
-  - ESLint - JavaScript 代码检查工具
-  - Prettier - 代码格式化工具
-  - tsx - TypeScript 执行和监视工具
+  - TypeScript (5.9.3) - 类型安全的 JavaScript 超集
+  - Vite (7.3.1) - 现代化的前端构建工具
+  - ESLint (10.0.2) - JavaScript 代码检查工具
+  - Prettier (3.8.1) - 代码格式化工具
+  - tsx (4.19.2) - TypeScript 执行和监视工具
 - **运行时依赖**:
   - express (^4.18.2) - Web 服务器框架
   - cors (^2.8.5) - 跨域资源共享支持
@@ -95,6 +131,12 @@ npm run lint:fix
 
 # 代码格式化
 npm run format
+
+# 运行测试
+npm test
+
+# E2E 测试
+npm run test:e2e
 ```
 
 **配置说明**：
@@ -116,6 +158,8 @@ iflow-run/
 │   └── iflow-run.js      # CLI 入口文件
 ├── dist/                  # TypeScript 编译输出目录
 │   └── server.js         # 编译后的服务器文件
+├── docs/                  # 项目文档目录
+│   └── PROJECT_PLAN.md   # 项目规划文档
 ├── public/                # 前端静态文件目录
 │   ├── index.html         # 主页面
 │   ├── app.js             # 前端应用逻辑
@@ -126,6 +170,11 @@ iflow-run/
 │   └── test-features.html # 功能测试页面
 └── test_screenshot.py     # 自动化测试脚本（Selenium）
 ```
+
+## 相关文档
+
+- **[PROJECT_PLAN.md](./docs/PROJECT_PLAN.md)** - 项目规划文档，包含功能分析、新功能提议和版本发布计划
+- **[README.md](./README.md)** - 项目介绍和快速开始指南
 
 ## 构建和运行
 
@@ -343,7 +392,28 @@ node server.js --dir=/path/to/.iflow
 }
 ```
 
-### 打开 iflow
+### 打开工作目录
+
+**端点**: `GET /api/open-workdir/:projectId/:sessionId`
+
+**描述**: 在系统文件管理器中打开会话的工作目录（从会话消息中提取 cwd）
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "path": "/path/to/working/directory"
+}
+```
+
+**错误响应**:
+```json
+{
+  "error": "No working directory found in session"
+}
+```
+
+### 打开 iflow（会话级别）
 
 **端点**: `GET /api/open-iflow/:projectId/:sessionId`
 
@@ -366,6 +436,73 @@ node server.js --dir=/path/to/.iflow
 ```json
 {
   "error": "No working directory found in session"
+}
+```
+
+### 打开 iflow（项目级别）
+
+**端点**: `GET /api/open-iflow-project/:projectId`
+
+**描述**: 从项目最新的会话中获取工作目录，打开终端并执行 iflow 命令
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "path": "/path/to/working/directory"
+}
+```
+
+**错误响应**:
+```json
+{
+  "error": "No working directory found in project sessions"
+}
+```
+
+### 获取统计数据
+
+**端点**: `GET /api/stats`
+
+**描述**: 获取所有项目的统计数据，包括项目数、会话数、消息数、工具调用次数、Token 消耗和工具使用统计
+
+**响应示例**:
+```json
+{
+  "totalProjects": 10,
+  "totalSessions": 50,
+  "totalMessages": 1000,
+  "totalToolCalls": 500,
+  "totalInputTokens": 50000,
+  "totalOutputTokens": 25000,
+  "totalTokens": 75000,
+  "estimatedCost": 0.1,
+  "toolUsageStats": {
+    "read_file": 100,
+    "write_file": 50,
+    "run_shell_command": 80
+  }
+}
+```
+
+### 删除会话
+
+**端点**: `DELETE /api/sessions/:projectId/:sessionId`
+
+**描述**: 删除指定的会话文件
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "Session deleted successfully"
+}
+```
+
+**错误响应**:
+```json
+{
+  "error": "Session not found"
 }
 ```
 
@@ -431,8 +568,32 @@ node server.js --dir=/path/to/.iflow
 - **CSS 变量**: 使用 CSS 变量定义颜色、间距等设计令牌
 - **响应式设计**: 支持桌面端和移动端布局
 - **动画**: 使用 CSS 动画提供流畅的用户体验
-- **主题**: 采用现代暗色主题，使用玻璃拟态效果
+- **主题**: 采用现代暗色主题，支持暗色/亮色主题切换
 - **组件化**: 样式按组件组织，便于维护和复用
+
+### 设计系统 (v1.1.6)
+
+项目采用 **"Digital Currents (数字流光)"** 设计理念，体现数据流动与科技感的视觉语言。
+
+#### 色彩系统
+
+| 变量名 | 用途 | 暗色模式 | 亮色模式 |
+|--------|------|----------|----------|
+| `--bg-primary` | 主背景 | `#0B0D10` | `#F8FAFC` |
+| `--bg-secondary` | 次级背景 | `#161B22` | `#FFFFFF` |
+| `--bg-tertiary` | 卡片/区块 | `#1C2128` | `#F1F5F9` |
+| `--accent-primary` | 主强调色 | `#00D4AA` | `#00B894` |
+| `--accent-secondary` | 次强调色 | `#7C3AED` | `#6D28D9` |
+| `--text-primary` | 主文字 | `#E6EDF3` | `#0F172A` |
+| `--text-secondary` | 次级文字 | `#8B949E` | `#475569` |
+
+#### 设计特点
+
+- **侧边栏光效**: 右边缘带有渐变光晕效果，增强视觉层次
+- **卡片悬停**: 悬停时显示微光阴影和边框高亮
+- **按钮交互**: 平滑过渡动画，强调色用于关键操作
+- **圆角系统**: 统一使用 `6px/8px/12px/16px` 四级圆角
+- **阴影层次**: 使用发光阴影增强科技感
 
 ### 消息格式处理
 
@@ -494,7 +655,17 @@ pip install selenium webdriver-manager
 
 # 运行测试脚本
 python test_screenshot.py
+
+# 运行 npm 测试（需要先安装 jest）
+npm install --save-dev jest
+npm test
+
+# E2E 测试（需要先安装 playwright）
+npm install --save-dev @playwright/test
+npm run test:e2e
 ```
+
+> **注意**: `jest` 和 `@playwright/test` 未包含在默认依赖中，需要手动安装。
 
 ### 测试功能
 
@@ -605,17 +776,48 @@ A: 请检查：
 2. 工作目录是否仍然存在
 3. 是否已安装 iflow CLI 并添加到系统 PATH
 
+### Q: "打开工作目录" 和 "打开项目目录" 有什么区别？
+
+A: 
+- **打开项目目录**: 打开 `.iflow/projects/<projectId>` 目录，这是 iflow 存储会话数据的目录
+- **打开工作目录**: 打开会话中 `cwd` 字段指定的目录，这是用户实际工作的项目目录
+
 ## 未来改进方向
+
+> 详细的功能规划请参考 [PROJECT_PLAN.md](./docs/PROJECT_PLAN.md)
+
+### 已完成功能
 
 - [x] 添加实时查看正在进行的会话功能（WebSocket）
 - [x] 优化大量会话的性能（服务端分页加载）
 - [x] 添加键盘快捷键支持
 - [x] 在工作目录打开 iflow 功能
 - [x] 消息内搜索和筛选功能
-- [ ] 添加用户配置功能（自定义数据目录、主题、缓存时间等）
+- [x] 打开工作目录功能
+- [x] 会话收藏功能（v1.1.6）
+- [x] 会话删除功能（v1.1.6）
+- [x] 用户设置面板（v1.1.6）
+- [x] 工具使用统计图表（v1.1.6）
+- [x] 后端统计 API（v1.1.6）
+
+### 计划中功能（v1.2.0）
+
 - [ ] 添加更多筛选条件（按模型、按状态等）
-- [ ] 支持批量操作（删除、导出多个会话）
-- [ ] 添加数据可视化图表（Token 使用趋势、工具使用统计等）
+- [ ] 支持批量操作（批量删除、批量导出多个会话）
+- [ ] 会话标签系统
+
+### 规划中功能（v1.3.0+）
+
+- [ ] Token 使用趋势图表
+- [ ] 数据备份与恢复
+- [ ] 会话分享功能
+- [ ] AI 助手集成
+- [ ] 数据可视化仪表板
+
+### 远期规划（v2.0.0）
+
 - [ ] 支持多语言界面
 - [ ] 支持会话比较功能
+- [ ] PWA 离线支持
+- [ ] 插件系统
 - [ ] 添加单元测试和 E2E 测试
