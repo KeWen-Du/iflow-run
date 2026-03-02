@@ -295,14 +295,20 @@ npm run format
 ### v1.1.5 (2026-03-02)
 
 **新功能**
-- 项目列表新增"打开 iflow"按钮，可直接从项目列表打开 iflow（悬停显示）
+- 侧边栏收起/展开功能，点击按钮可收起侧边栏，状态自动保存
+- 会话详情页新增"打开 iflow"按钮，可在会话工作目录打开终端并执行 iflow
+- 项目列表新增"打开 iflow"按钮（悬停显示），可直接从项目列表打开 iflow
+- 新增 API 端点 `/api/open-iflow/:projectId/:sessionId` 和 `/api/open-iflow-project/:projectId`
+- 打开 iflow 功能支持 Windows、macOS、Linux 多平台
 
 **优化**
-- 侧边栏收起功能优化，改进收起后的布局对齐
+- 侧边栏宽度从 320px 调整为 280px，收起后宽度 48px
+- 项目列表项布局优化，使用 flex 布局支持按钮显示
+- 添加 CSS 过渡动画，提升用户体验
 
 **修复**
-- 修复白色主题下切换按钮图标未变色的问题
-- 修复控制台语法错误 `Illegal return statement`
+- 修复白色主题下主题切换按钮图标未变色的问题
+- 移除多余的 console.log 调试日志
 
 ### v1.1.4
 
