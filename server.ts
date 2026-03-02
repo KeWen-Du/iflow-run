@@ -417,6 +417,212 @@ app.get('/api/open-directory/:projectId', async (req: Request, res: Response) =>
   }
 });
 
+// 在项目的工作目录打开终端并执行 iflow（从最新会话获取工作目录）
+app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const projectDir = path.join(PROJECTS_DIR, String(projectId));
+
+    // 检查项目目录是否存在
+    const dirExists = await fs.access(projectDir).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // 获取所有会话文件并按修改时间排序
+    const files = await fs.readdir(projectDir);
+    const sessionFiles = files.filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
+    
+    if (sessionFiles.length === 0) {
+      return res.status(404).json({ error: 'No sessions found in project' });
+    }
+
+    // 获取文件状态并按修改时间排序
+    const fileStats = await Promise.all(
+      sessionFiles.map(async (f) => {
+        const filePath = path.join(projectDir, f);
+        const stat = await fs.stat(filePath);
+        return { file: f, mtime: stat.mtime };
+      })
+    );
+    fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+    // 从最新的会话中获取工作目录
+    let workingDir: string | null = null;
+    for (const { file } of fileStats) {
+      const sessionFile = path.join(projectDir, file);
+      const content = await fs.readFile(sessionFile, 'utf8');
+      const lines = content.split('\n').filter(line => line.trim());
+      
+      for (const line of lines) {
+        const msg: Message = JSON.parse(line);
+        if (msg.type === 'user' && msg.cwd) {
+          workingDir = msg.cwd;
+          break;
+        }
+      }
+      if (workingDir) break;
+    }
+
+    if (!workingDir) {
+      return res.status(400).json({ error: 'No working directory found in project sessions' });
+    }
+
+    // 检查工作目录是否存在
+    const workDirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    if (!workDirExists) {
+      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+    }
+
+    const { spawn } = require('child_process');
+
+    if (process.platform === 'win32') {
+      const psScript = `Set-Location -Path '${workingDir}'; Write-Host 'Working directory: ${workingDir}'; Write-Host 'Starting iflow...'; iflow`;
+      const base64Command = Buffer.from(psScript, 'utf16le').toString('base64');
+      
+      const child = spawn('cmd.exe', [
+        '/c',
+        'start',
+        'powershell.exe',
+        '-NoExit',
+        '-EncodedCommand',
+        base64Command
+      ], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+      
+      console.log(`Opening iflow in project: ${workingDir}`);
+      res.json({ success: true, path: workingDir });
+    } else if (process.platform === 'darwin') {
+      const script = `tell application "Terminal" to do script "cd '${workingDir}' && iflow"`;
+      spawn('osascript', ['-e', script], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: workingDir });
+    } else {
+      const terminals = [
+        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+      ];
+
+      let launched = false;
+      for (const terminal of terminals) {
+        try {
+          spawn(terminal.cmd, terminal.args, { detached: true, stdio: 'ignore' });
+          launched = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (launched) {
+        res.json({ success: true, path: workingDir });
+      } else {
+        res.status(500).json({ error: 'No suitable terminal emulator found' });
+      }
+    }
+  } catch (error) {
+    console.error('Error opening iflow for project:', error);
+    res.status(500).json({ error: 'Failed to open iflow', message: (error as Error).message });
+  }
+});
+
+// 在工作目录打开终端并执行 iflow
+app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.params;
+    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+
+    const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
+    if (!fileExists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // 读取会话文件获取工作目录
+    const content = await fs.readFile(sessionFile, 'utf8');
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    // 从第一条用户消息中获取 cwd
+    let workingDir: string | null = null;
+    for (const line of lines) {
+      const msg: Message = JSON.parse(line);
+      if (msg.type === 'user' && msg.cwd) {
+        workingDir = msg.cwd;
+        break;
+      }
+    }
+
+    if (!workingDir) {
+      return res.status(400).json({ error: 'No working directory found in session' });
+    }
+
+    // 检查工作目录是否存在
+    const dirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    if (!dirExists) {
+      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+    }
+
+    const { spawn } = require('child_process');
+
+    if (process.platform === 'win32') {
+      // Windows: 使用 cmd.exe 的 start 命令启动新的 PowerShell 窗口
+      const psScript = `Set-Location -Path '${workingDir}'; Write-Host 'Working directory: ${workingDir}'; Write-Host 'Starting iflow...'; iflow`;
+      const base64Command = Buffer.from(psScript, 'utf16le').toString('base64');
+      
+      // 使用 cmd.exe start 命令启动新窗口
+      const child = spawn('cmd.exe', [
+        '/c',
+        'start',
+        'powershell.exe',
+        '-NoExit',
+        '-EncodedCommand',
+        base64Command
+      ], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+      
+      console.log(`Opening iflow in: ${workingDir}`);
+      res.json({ success: true, path: workingDir });
+    } else if (process.platform === 'darwin') {
+      // macOS: 打开 Terminal 并执行 iflow
+      const script = `tell application "Terminal" to do script "cd '${workingDir}' && iflow"`;
+      spawn('osascript', ['-e', script], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: workingDir });
+    } else {
+      // Linux: 尝试使用常见的终端模拟器
+      const terminals = [
+        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+      ];
+
+      let launched = false;
+      for (const terminal of terminals) {
+        try {
+          spawn(terminal.cmd, terminal.args, { detached: true, stdio: 'ignore' });
+          launched = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (launched) {
+        res.json({ success: true, path: workingDir });
+      } else {
+        res.status(500).json({ error: 'No suitable terminal emulator found' });
+      }
+    }
+  } catch (error) {
+    console.error('Error opening iflow:', error);
+    res.status(500).json({ error: 'Failed to open iflow', message: (error as Error).message });
+  }
+});
+
 // 提取消息内容
 function extractContent(msg: Message): string {
   if (!msg.message || !msg.message.content) return '';

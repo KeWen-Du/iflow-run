@@ -9,28 +9,41 @@ class MarkdownRenderer {
   constructor() {
     this.marked = window.marked;
     this.hljs = window.hljs;
-    this.init();
+    if (this.marked && this.hljs) {
+      this.init();
+    } else {
+      console.warn('MarkdownRenderer: marked or hljs not loaded');
+    }
   }
 
   init() {
-    // 配置 marked
-    this.marked.setOptions({
-      breaks: true,
-      gfm: true,
-      highlight: (code: string, lang: string) => {
-        if (lang && this.hljs.getLanguage(lang)) {
-          try {
-            return this.hljs.highlight(code, { language: lang }).value;
-          } catch (err) {
-            console.error('Highlight.js error:', err);
+    // marked v17+ 使用 marked.use() 配置
+    if (this.marked && this.marked.use) {
+      this.marked.use({
+        breaks: true,
+        gfm: true,
+        renderer: {
+          code(code, language) {
+            if (language && window.hljs.getLanguage(language)) {
+              try {
+                const highlighted = window.hljs.highlight(code, { language }).value;
+                return `<pre><code class="hljs language-${language}">${highlighted}</code></pre>`;
+              } catch (err) {
+                console.error('Highlight.js error:', err);
+              }
+            }
+            const autoHighlighted = window.hljs.highlightAuto(code).value;
+            return `<pre><code class="hljs">${autoHighlighted}</code></pre>`;
           }
         }
-        return this.hljs.highlightAuto(code).value;
-      }
-    });
+      });
+    }
   }
 
   render(markdown) {
+    if (!this.marked) {
+      return this.escapeHtml(markdown);
+    }
     try {
       return this.marked.parse(markdown);
     } catch (err) {
@@ -64,8 +77,8 @@ class MarkdownRenderer {
   }
 }
 
-// 全局 Markdown 渲染器实例
-const markdownRenderer = new MarkdownRenderer();
+// 全局 Markdown 渲染器实例（延迟初始化）
+let markdownRenderer = null;
 
 // ==================== 键盘快捷键 ====================
 
@@ -99,7 +112,7 @@ class KeyboardShortcuts {
   }
 
   buildKeyString(e) {
-    const parts: string[] = [];
+    const parts = [];
     if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
     if (e.altKey) parts.push('Alt');
     if (e.shiftKey) parts.push('Shift');
@@ -130,11 +143,16 @@ class WebSocketManager {
   }
 
   connect(url) {
+    // 如果没有传入 URL，自动生成
+    if (!url) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      url = `${protocol}//${window.location.host}/ws`;
+    }
+    
     try {
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
         this.reconnectAttempts = 0;
         this.emit('connected');
       };
@@ -154,7 +172,6 @@ class WebSocketManager {
       };
 
       this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
         this.emit('disconnected');
         this.reconnect();
       };
@@ -166,7 +183,6 @@ class WebSocketManager {
   reconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`Reconnecting... Attempt ${this.reconnectAttempts}`);
       setTimeout(() => {
         this.connect();
       }, this.reconnectDelay);
@@ -177,7 +193,7 @@ class WebSocketManager {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event)!.push(callback);
+    this.listeners.get(event).push(callback);
   }
 
   emit(event, data) {
@@ -209,7 +225,7 @@ class PaginationManager {
     this.isLoading = false;
   }
 
-  setPage(page: number) {
+  setPage(page) {
     if (page >= 1 && page <= this.totalPages) {
       this.currentPage = page;
     }
@@ -227,12 +243,12 @@ class PaginationManager {
     }
   }
 
-  setPageSize(size: number) {
+  setPageSize(size) {
     this.pageSize = size;
     this.currentPage = 1;
   }
 
-  updatePagination(total: number) {
+  updatePagination(total) {
     this.totalItems = total;
     this.totalPages = Math.ceil(total / this.pageSize);
     this.currentPage = Math.min(this.currentPage, this.totalPages) || 1;
@@ -256,6 +272,11 @@ const paginationManager = new PaginationManager();
 // ==================== 初始化增强功能 ====================
 
 function initEnhancements() {
+  // 初始化 Markdown 渲染器
+  if (window.marked && window.hljs) {
+    markdownRenderer = new MarkdownRenderer();
+  }
+
   // 初始化键盘快捷键
   setupKeyboardShortcuts();
 
@@ -354,8 +375,6 @@ function setupKeyboardShortcuts() {
   keyboardShortcuts.register('Ctrl+S', () => {
     showShortcutsHelp();
   }, '显示快捷键帮助');
-
-  console.log('键盘快捷键已设置');
 }
 
 // 设置 WebSocket
@@ -365,7 +384,6 @@ function setupWebSocket() {
   // 监听会话更新
   wsManager.on('message', (data) => {
     if (data.type === 'session_update') {
-      console.log('检测到会话更新');
       // 显示通知
       showToast('会话已更新', 'info');
       // 刷新项目列表
@@ -375,20 +393,20 @@ function setupWebSocket() {
     }
   });
 
-  // 监听连接状态
+  // 监听连接状态（只在首次连接成功时提示）
   wsManager.on('connected', () => {
     showToast('实时连接已建立', 'success');
     updateWsStatus(true);
   });
 
   wsManager.on('disconnected', () => {
-    showToast('实时连接已断开', 'error');
+    // 只更新状态指示器，不显示 toast 避免频繁打扰
     updateWsStatus(false);
   });
 }
 
 // 更新 WebSocket 状态显示
-function updateWsStatus(connected: boolean) {
+function updateWsStatus(connected) {
   const wsStatus = document.getElementById('wsStatus');
   const wsStatusIndicator = document.getElementById('wsStatusIndicator');
   const wsStatusText = document.getElementById('wsStatusText');
@@ -403,7 +421,6 @@ function updateWsStatus(connected: boolean) {
 // 设置分页
 function setupPagination() {
   // 这个函数将在 loadProjects 中被调用
-  console.log('分页管理器已初始化');
 }
 
 // 显示快捷键帮助
@@ -447,33 +464,29 @@ function showShortcutsHelp() {
 
 // ==================== 工具函数 ====================
 
-// 显示 Toast 通知（如果已存在则使用现有的）
+// 显示 Toast 通知
 function showToast(message, type = 'success') {
-  if (typeof window.showToast === 'function') {
-    window.showToast(message, type);
-  } else {
-    // 降级实现
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10000;
-    `;
-    
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    toast.style.cssText = `
-      background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      animation: slideUp 0.3s ease;
-    `;
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+  `;
+  
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+  `;
     
     wrapper.appendChild(toast);
     document.body.appendChild(wrapper);
@@ -482,7 +495,6 @@ function showToast(message, type = 'success') {
       toast.style.animation = 'slideDown 0.3s ease';
       setTimeout(() => wrapper.remove(), 300);
     }, 2000);
-  }
 }
 
 // ==================== 导出全局变量 ====================

@@ -14,6 +14,8 @@ let messageFilter = 'all'; // 消息类型筛选：all, user, assistant, tools
 let currentSearchQuery = ''; // 当前搜索查询
 
 // DOM 元素
+const sidebar = document.getElementById('sidebar');
+const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 const projectsList = document.getElementById('projectsList');
 const sessionsContainer = document.getElementById('sessionsContainer');
 const sessionDetail = document.getElementById('sessionDetail');
@@ -26,6 +28,7 @@ const statsBtn = document.getElementById('statsBtn');
 const themeBtn = document.getElementById('themeBtn');
 const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
 const exportJsonBtn = document.getElementById('exportJsonBtn');
+const openIflowBtn = document.getElementById('openIflowBtn');
 const openDirectoryBtn = document.getElementById('openDirectoryBtn');
 const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
 const toggleMessageIndexBtn = document.getElementById('toggleMessageIndexBtn');
@@ -221,12 +224,26 @@ async function init() {
     document.body.classList.add('light-mode');
   }
 
+  // 加载侧边栏状态
+  const sidebarCollapsed = localStorage.getItem('sidebarCollapsed');
+  if (sidebarCollapsed === 'true' && sidebar) {
+    sidebar.classList.add('collapsed');
+  }
+
   await loadProjects();
   setupEventListeners();
 }
 
 // 设置事件监听
 function setupEventListeners() {
+  // 侧边栏切换
+  if (toggleSidebarBtn && sidebar) {
+    toggleSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+    });
+  }
+
   if (backBtn) {
     backBtn.addEventListener('click', () => {
       sessionDetail.classList.add('hidden');
@@ -303,6 +320,13 @@ function setupEventListeners() {
     });
   }
 
+  // 打开 iflow 功能
+  if (openIflowBtn) {
+    openIflowBtn.addEventListener('click', () => {
+      openIflowInWorkingDir();
+    });
+  }
+
   // 打开目录功能
   if (openDirectoryBtn) {
     openDirectoryBtn.addEventListener('click', () => {
@@ -369,7 +393,6 @@ function setupEventListeners() {
       const card = e.target.closest('.session-card');
       if (card) {
         const sessionId = card.dataset.sessionId;
-        console.log('Session card clicked via delegation:', sessionId);
         loadSession(sessionId);
       }
     });
@@ -425,19 +448,38 @@ function renderProjectsList() {
   projectsList.innerHTML = projects.map(project => `
     <div class="project-item ${currentProject?.id === project.id ? 'active' : ''}" 
          data-project-id="${project.id}">
-      <div class="project-name">${project.name}</div>
-      <div class="project-meta">
-        <span class="session-count">${project.sessionCount} 个会话</span>
+      <div class="project-item-content">
+        <div class="project-name">${project.name}</div>
+        <div class="project-meta">
+          <span class="session-count">${project.sessionCount} 个会话</span>
+        </div>
       </div>
+      <button class="btn btn-icon project-open-iflow" data-project-id="${project.id}" title="打开 iflow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 17 10 11 4 5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="19" x2="20" y2="19" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   `).join('');
 
-  // 添加点击事件
-  document.querySelectorAll('.project-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const projectId = item.dataset.projectId;
+  // 添加点击事件（使用事件委托）
+  projectsList.addEventListener('click', (e) => {
+    // 检查是否点击了打开 iflow 按钮
+    const openIflowBtn = e.target.closest('.project-open-iflow');
+    if (openIflowBtn) {
+      e.stopPropagation();
+      const projectId = openIflowBtn.dataset.projectId;
+      openIflowForProject(projectId);
+      return;
+    }
+
+    // 检查是否点击了项目项
+    const projectItem = e.target.closest('.project-item');
+    if (projectItem) {
+      const projectId = projectItem.dataset.projectId;
       selectProject(projectId);
-    });
+    }
   });
 }
 
@@ -460,8 +502,6 @@ function selectProject(projectId) {
 
 // 渲染会话列表
 function renderSessionsList() {
-  console.log('renderSessionsList called, currentProject:', currentProject?.id);
-
   if (!currentProject || currentProject.sessions.length === 0) {
     sessionsContainer.innerHTML = `
       <div class="empty-state">
@@ -511,15 +551,10 @@ function renderSessionsList() {
       `).join('')}
     </div>
   `;
-
-  console.log('Rendered', filteredSessions.length, 'session cards');
 }
 
 // 加载会话详情
 async function loadSession(sessionId) {
-  console.log('loadSession called with sessionId:', sessionId);
-  console.log('currentProject:', currentProject);
-
   if (!currentProject) {
     console.error('currentProject is null!');
     return;
@@ -527,10 +562,8 @@ async function loadSession(sessionId) {
 
   try {
     const url = `/api/sessions/${currentProject.id}/${sessionId}`;
-    console.log('Fetching:', url);
     const response = await fetch(url);
     const messages = await response.json();
-    console.log('Messages loaded:', messages.length);
 
     currentSession = {
       id: sessionId,
@@ -1088,7 +1121,6 @@ function handleScroll() {
 // 提取消息内容
 function extractMessageContent(msg) {
   if (!msg.message || !msg.message.content) {
-    console.log('No message content for:', msg.uuid);
     return '';
   }
 
@@ -1111,7 +1143,6 @@ function extractMessageContent(msg) {
     const hasOnlyToolResults = content.length > 0 &&
                                content.every(c => c.type === 'tool_result');
     if (hasOnlyToolResults) {
-      console.log('Skipping tool_result message:', msg.uuid);
       return '';
     }
 
@@ -1124,7 +1155,6 @@ function extractMessageContent(msg) {
     return JSON.stringify(content, null, 2);
   }
 
-  console.log('Unknown content type:', typeof content, content);
   return '';
 }
 
@@ -1678,5 +1708,44 @@ async function openProjectDirectory() {
   } catch (error) {
     console.error('Failed to open directory:', error);
     showToast('打开目录失败', 'error');
+  }
+}
+
+// 在工作目录打开终端并执行 iflow
+async function openIflowInWorkingDir() {
+  if (!currentProject || !currentSession) {
+    showToast('没有选中的会话', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/open-iflow/${currentProject.id}/${currentSession.id}`);
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`已在 ${result.path} 打开 iflow`);
+    } else {
+      showToast(result.error || '打开 iflow 失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to open iflow:', error);
+    showToast('打开 iflow 失败', 'error');
+  }
+}
+
+// 在项目的工作目录打开终端并执行 iflow
+async function openIflowForProject(projectId) {
+  try {
+    const response = await fetch(`/api/open-iflow-project/${projectId}`);
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`已在 ${result.path} 打开 iflow`);
+    } else {
+      showToast(result.error || '打开 iflow 失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to open iflow for project:', error);
+    showToast('打开 iflow 失败', 'error');
   }
 }

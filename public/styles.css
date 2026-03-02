@@ -38,39 +38,110 @@ body {
 
 /* 侧边栏 */
 .sidebar {
-  width: 320px;
+  width: 280px;
+  min-width: 280px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(20px);
   background: rgba(18, 18, 26, 0.95);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.sidebar.collapsed {
+  width: 48px;
+  min-width: 48px;
+}
+
+.sidebar.collapsed .logo-text,
+.sidebar.collapsed .section-title,
+.sidebar.collapsed .projects-list {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.sidebar.collapsed .sidebar-section {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding: 12px 8px;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar.collapsed .logo {
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+  margin: 0;
+}
+
+.sidebar.collapsed .sidebar-toggle svg {
+  transform: rotate(180deg);
 }
 
 .sidebar-header {
-  padding: 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  transition: all 0.2s ease;
+  overflow: hidden;
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   color: var(--accent-primary);
+  flex-shrink: 0;
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
+}
+
+.sidebar-toggle {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-tertiary);
 }
 
 .sidebar-section {
@@ -78,6 +149,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: opacity 0.2s ease;
 }
 
 .section-title {
@@ -125,6 +197,31 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-item-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.project-open-iflow {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.project-item:hover .project-open-iflow {
+  opacity: 1;
+}
+
+.project-open-iflow:hover {
+  background: var(--accent-primary);
+  color: white;
 }
 
 .project-item:hover {
@@ -283,6 +380,19 @@ body {
 .btn-secondary:hover {
   background: var(--bg-glass);
   border-color: var(--border-hover);
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: white;
+  border: none;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
 /* 会话容器 */
@@ -1302,6 +1412,10 @@ body.light-mode .sun-icon {
 
 body.light-mode .moon-icon {
   display: block;
+}
+
+body.light-mode .moon-icon.hidden {
+  display: block !important;
 }
 
 .moon-icon {
