@@ -9,24 +9,31 @@
 
 - 📁 **项目管理** - 浏览和查看 iFlow CLI 创建的所有项目
 - 💬 **会话浏览** - 查看每个项目下的所有会话历史
-- ⭐ **会话收藏** - 收藏重要会话，收藏的会话显示在列表顶部 (v1.1.6)
-- 🗑️ **会话删除** - 删除不需要的会话文件 (v1.1.6)
+- ⭐ **会话收藏** - 收藏重要会话，收藏的会话显示在列表顶部
+- 🗑️ **会话删除** - 删除不需要的会话文件
+- 🏷️ **会话标签** - 为会话添加自定义标签，支持标签筛选
+- 🔍 **高级筛选** - 按模型、状态、标签筛选会话
+- ✅ **批量操作** - 批量选择、删除、导出会话
 - 🔍 **消息详情** - 查看完整的对话消息，包括用户消息、助手响应、工具调用和工具结果
 - 👁️ **预览功能** - 快速预览会话的第一条消息内容
 - 📊 **会话上下文** - 显示工作目录、Git 分支、版本信息等环境上下文
 - 🔎 **消息筛选** - 支持按类型筛选消息（用户/助手/工具调用）和内容搜索
 - 💰 **Token 统计** - 显示模型名称、Token 消耗、执行时间和预估成本
-- 📈 **工具使用统计** - 可视化展示工具调用次数统计图表 (v1.1.6)
+- 📈 **工具使用统计** - 可视化展示工具调用次数统计图表
 - 🔄 **环境追踪** - 检测并显示工作目录和 Git 分支的变更
 - 📥 **导出功能** - 支持导出会话为 Markdown 或 JSON 格式
+- 📥 **批量导出** - 批量导出多个会话
 - 📋 **消息目录** - 快速导航到用户消息
-- ⚙️ **用户设置面板** - 自定义主题、显示数量、默认筛选等偏好设置 (v1.1.6)
+- ⚙️ **用户设置面板** - 自定义主题、显示数量、默认筛选等偏好设置
 - 📄 **分页加载** - 支持项目列表分页加载，提升大量项目时的性能
 - 🎨 **Markdown 渲染** - 支持 Markdown 格式消息的渲染和代码高亮
 - ⌨️ **键盘快捷键** - 支持键盘快捷键操作，提升使用效率
 - 🔄 **实时更新** - 通过 WebSocket 实时监听会话文件变更
 - 🎨 **现代 UI** - 采用 "Digital Currents (数字流光)" 设计理念，支持暗色/亮色主题切换
 - 📱 **响应式设计** - 支持桌面端和移动端访问
+- 🤖 **AI 助手** - 集成 AI 对话和会话分析功能 (v1.3.0)
+- 📊 **数据仪表板** - 综合数据可视化和统计图表 (v1.3.0)
+- 💾 **数据备份恢复** - 导出和恢复用户数据 (v1.3.0)
 
 ## 技术栈
 
@@ -41,11 +48,11 @@
   - highlight.js (^11.11.1) - 代码语法高亮
   - ws (^8.19.0) - WebSocket 支持
 - **开发工具**:
-  - TypeScript (5.9.3) - 类型安全
-  - Vite (7.3.1) - 现代化构建工具
-  - ESLint (10.0.2) - 代码检查
-  - Prettier (3.8.1) - 代码格式化
-  - tsx (4.19.2) - TypeScript 执行和监视工具
+  - TypeScript (^5.9.3) - 类型安全
+  - Vite (^7.3.1) - 现代化构建工具
+  - ESLint (^10.0.2) - 代码检查
+  - Prettier (^3.8.1) - 代码格式化
+  - tsx (^4.19.2) - TypeScript 执行和监视工具
 
 ## 快速开始
 
@@ -76,6 +83,12 @@ iflow-run --port=8080
 # 指定 iflow 数据目录
 iflow-run --dir=/path/to/.iflow
 
+# 后台运行
+iflow-run --daemon
+
+# 停止后台服务
+iflow-run --stop
+
 # 使用环境变量
 IFLOW_RUN_PORT=8080 iflow-run
 IFLOW_RUN_DIR=/path/to/.iflow iflow-run
@@ -96,11 +109,14 @@ cd iflow-run
 # 安装依赖
 npm install
 
+# 构建项目
+npm run build
+
 # 启动服务器
 npm start
 
-# 或使用 npx 运行（如果已全局安装）
-npx iflow-run
+# 开发模式（热重载）
+npm run dev:watch
 
 # 访问应用
 # 打开浏览器访问 http://localhost:3000
@@ -145,7 +161,7 @@ iflow-run/
 GET /api/projects
 ```
 
-返回所有项目和它们的会话列表。
+返回所有项目和它们的会话列表（支持分页）。
 
 ### 获取会话详情
 
@@ -155,7 +171,7 @@ GET /api/sessions/:projectId/:sessionId
 
 返回指定会话的完整消息记录。
 
-### 删除会话 (v1.1.6)
+### 删除会话
 
 ```http
 DELETE /api/sessions/:projectId/:sessionId
@@ -163,15 +179,23 @@ DELETE /api/sessions/:projectId/:sessionId
 
 删除指定的会话文件。
 
-响应示例：
-```json
-{
-  "success": true,
-  "message": "Session deleted successfully"
-}
+### 批量删除会话
+
+```http
+POST /api/sessions/batch-delete
 ```
 
-### 获取统计数据 (v1.1.6)
+批量删除多个会话文件。
+
+### 批量导出会话
+
+```http
+POST /api/sessions/batch-export
+```
+
+批量导出多个会话为 JSON 或 Markdown 格式。
+
+### 获取统计数据
 
 ```http
 GET /api/stats
@@ -179,24 +203,42 @@ GET /api/stats
 
 返回所有项目的统计数据，包括工具使用统计。
 
-响应示例：
-```json
-{
-  "totalProjects": 10,
-  "totalSessions": 50,
-  "totalMessages": 1000,
-  "totalToolCalls": 500,
-  "totalInputTokens": 50000,
-  "totalOutputTokens": 25000,
-  "totalTokens": 75000,
-  "estimatedCost": 0.1,
-  "toolUsageStats": {
-    "read_file": 100,
-    "write_file": 50,
-    "run_shell_command": 80
-  }
-}
+### 数据可视化仪表板 (v1.3.0)
+
+```http
+GET /api/dashboard
 ```
+
+返回仪表板统计数据，包括概览、趋势、工具统计、模型分布、活动热力图。
+
+### Token 使用趋势 (v1.3.0)
+
+```http
+GET /api/stats/trends?period=day&days=30
+```
+
+返回 Token 使用趋势数据。
+
+### 数据备份与恢复 (v1.3.0)
+
+```http
+GET /api/backup
+POST /api/restore
+```
+
+导出和恢复用户数据。
+
+### AI 功能 (v1.3.0)
+
+```http
+GET /api/ai/config
+POST /api/ai/config
+POST /api/ai/test
+POST /api/ai/chat
+POST /api/ai/analyze
+```
+
+AI 配置管理、对话和会话分析。
 
 ### 搜索会话
 
@@ -212,27 +254,6 @@ GET /api/search?q=关键词&page=1&limit=20&type=all
 - `startDate` (number): 开始时间戳（可选）
 - `endDate` (number): 结束时间戳（可选）
 
-响应示例：
-```json
-{
-  "results": [
-    {
-      "projectId": "project-id",
-      "projectName": "项目名称",
-      "sessionId": "session-1234567890",
-      "content": "消息内容预览...",
-      "type": "user",
-      "timestamp": 1704110400000,
-      "uuid": "message-uuid"
-    }
-  ],
-  "total": 100,
-  "page": 1,
-  "limit": 20,
-  "totalPages": 5
-}
-```
-
 ## 配置
 
 ### 通过命令行参数配置
@@ -243,6 +264,12 @@ iflow-run --port=8080
 
 # 修改 iflow 数据目录
 iflow-run --dir=/path/to/.iflow
+
+# 后台运行
+iflow-run --daemon
+
+# 停止后台服务
+iflow-run --stop
 ```
 
 ### 通过环境变量配置
@@ -253,18 +280,27 @@ export IFLOW_RUN_PORT=8080
 export IFLOW_RUN_DIR=/path/to/.iflow
 iflow-run
 
-# Windows
-set IFLOW_RUN_PORT=8080
-set IFLOW_RUN_DIR=C:\path\to\.iflow
+# Windows PowerShell
+$env:IFLOW_RUN_PORT=8080
+$env:IFLOW_RUN_DIR=C:\path\to\.iflow
 iflow-run
 ```
 
 ### 默认配置
 
-- **端口**: 3000
+- **端口**: 3000（如被占用会自动使用下一个可用端口）
 - **数据目录**: `~/.iflow` (用户主目录下的 .iflow 文件夹)
   - Windows: `C:\Users\{用户名}\.iflow`
   - Linux/Mac: `/home/{用户名}/.iflow`
+
+### 数据存储
+
+应用在 `~/.iflow/` 目录下存储以下配置文件：
+
+| 文件名 | 描述 |
+|--------|------|
+| `iflow-run-tags.json` | 会话标签数据 |
+| `iflow-run-ai-config.json` | AI 服务配置 |
 
 ## 测试
 
@@ -284,14 +320,7 @@ python test_screenshot.py
 3. 点击第一个会话并截图会话详情
 4. 测试返回按钮功能
 
-
-
 ## 开发
-
-### 环境要求
-
-- Node.js (v14 或更高版本)
-- npm (随 Node.js 一起安装)
 
 ### 开发命令
 
@@ -340,18 +369,6 @@ npm run test:e2e
 - **样式**: 使用 CSS 变量定义设计令牌，支持主题定制
 - **TypeScript**: 严格模式，完整的类型定义
 
-### 自定义主题
-
-编辑 `public/styles.css` 文件中的 CSS 变量：
-
-```css
-:root {
-  --bg-primary: #0a0a0f;
-  --accent-primary: #6366f1;
-  /* 更多颜色变量... */
-}
-```
-
 ### 键盘快捷键
 
 | 快捷键 | 功能 |
@@ -360,18 +377,38 @@ npm run test:e2e
 | `Esc` | 关闭模态框/返回 |
 | `Ctrl/Cmd + R` | 刷新项目列表 |
 
-## API 文档
-
-### 主要端点
-
-- `GET /api/projects` - 获取项目列表（支持分页和搜索）
-- `GET /api/sessions/:projectId/:sessionId` - 获取会话详情
-- `GET /api/search` - 搜索会话消息
-- `WS /ws` - WebSocket 实时更新
-
-详细的 API 文档请参考 [AGENTS.md](./AGENTS.md)
-
 ## 更新日志
+
+### v1.3.0 (2026-03-07)
+
+**新功能**
+- 🤖 **AI 助手集成** - 集成心流开放平台/OpenAI API，支持 AI 对话、会话分析
+- 📊 **会话分析报告** - AI 自动分析会话，生成摘要、关键决策、问题解决过程和改进建议
+- 💬 **AI 助手侧边栏** - 在应用内直接与 AI 对话，支持快速分析和代码解释
+- ⚙️ **AI 服务配置** - 支持配置 API Key、选择服务商（心流/OpenAI）、选择模型
+- 🔗 **API 连接测试** - 在设置面板测试 AI API 连接状态
+- 📈 **Token 使用趋势图表** - 按日/周/月聚合展示 Token 使用趋势
+- 📊 **数据可视化仪表板** - 综合展示项目统计、工具使用、模型分布、活动热力图
+- 💾 **数据备份与恢复** - 支持导出和恢复用户数据（收藏、标签、设置）
+
+**优化**
+- 数据仪表板界面增强，展示更多统计数据
+- 会话详情页新增"分析会话"按钮
+- 支持 Markdown 格式的 AI 响应渲染
+
+### v1.2.0 (2026-03-03)
+
+**新功能**
+- 🏷️ **会话标签系统** - 为会话添加自定义标签，支持标签管理和筛选
+- 🔍 **高级筛选** - 按模型、状态（成功/有错误）、标签筛选会话
+- ✅ **批量操作模式** - 进入批量模式后可多选会话进行批量操作
+- 🗑️ **批量删除** - 一次性删除多个会话
+- 📥 **批量导出** - 批量导出多个会话为 JSON 或 Markdown 格式
+- 📊 **会话元数据** - 会话卡片显示模型名称、执行状态、Token 消耗信息
+
+**优化**
+- 会话列表增强：显示模型、状态、Token 消耗、标签等信息
+- 标签数据持久化存储
 
 ### v1.1.6 (2026-03-03)
 
@@ -380,8 +417,8 @@ npm run test:e2e
 - 🗑️ **会话删除功能** - 点击删除按钮删除不需要的会话，带确认对话框防止误操作
 - ⚙️ **用户设置面板** - 支持主题模式（暗色/亮色）、每页显示数量、默认消息筛选、自动刷新等设置
 - 📈 **工具使用统计图表** - 在统计面板中展示 Top 10 工具调用统计，可视化展示使用频率
-- 🔌 **后端统计 API** - 新增 `/api/stats` 接口，提供完整统计数据和工具使用统计，优化前端加载性能
-- 🗑️ **会话删除 API** - 新增 `DELETE /api/sessions/:projectId/:sessionId` 接口，支持删除会话文件
+- 🔌 **后端统计 API** - 新增 `/api/stats` 接口，提供完整统计数据和工具使用统计
+- 🗑️ **会话删除 API** - 新增 `DELETE /api/sessions/:projectId/:sessionId` 接口
 
 **优化**
 - 统计面板改用后端 API，提升大数据量下的加载速度
@@ -391,30 +428,14 @@ npm run test:e2e
 ### v1.1.5 (2026-03-02)
 
 **新功能**
-- 侧边栏收起/展开功能，点击按钮可收起侧边栏，状态自动保存
-- 会话详情页新增"打开 iflow"按钮，可在会话工作目录打开终端并执行 iflow
-- 项目列表新增"打开 iflow"按钮（悬停显示），可直接从项目列表打开 iflow
-- 新增 API 端点 `/api/open-iflow/:projectId/:sessionId` 和 `/api/open-iflow-project/:projectId`
-- 打开 iflow 功能支持 Windows、macOS、Linux 多平台
+- 侧边栏收起/展开功能，状态自动保存
+- 会话详情页新增"打开 iflow"按钮
+- 项目列表新增"打开 iflow"按钮（悬停显示）
+- 新增 API 端点支持打开 iflow 功能
 
 **优化**
-- 侧边栏宽度从 320px 调整为 280px，收起后宽度 48px
-- 项目列表项布局优化，使用 flex 布局支持按钮显示
-- 添加 CSS 过渡动画，提升用户体验
-
-**修复**
-- 修复白色主题下主题切换按钮图标未变色的问题
-- 移除多余的 console.log 调试日志
-
-### v1.1.4
-
-- WebSocket 实时更新功能
-- 键盘快捷键支持
-
-### v1.1.3
-
-- 消息目录快速导航功能
-- 分页加载优化
+- 侧边栏宽度优化
+- 添加 CSS 过渡动画
 
 ## 常见问题
 
@@ -442,9 +463,14 @@ npm run test:e2e
 
 Token 统计依赖于会话消息中的 `usage` 字段。如果模型未返回该信息，则无法显示 Token 统计。
 
-### 环境变更提示没有显示？
+### AI 助手功能如何配置？
 
-环境变更提示需要消息中包含 `cwd` 或 `gitBranch` 字段。只有当这些字段发生变化时才会显示提示。
+在设置面板中配置 AI 服务：
+1. 选择服务商（心流开放平台 或 OpenAI）
+2. 输入 API Key
+3. 选择模型
+4. 点击"测试连接"验证配置
+5. 启用 AI 功能
 
 ## 贡献
 
@@ -459,56 +485,3 @@ MIT License
 - [Express](https://expressjs.com/) - Web 框架
 - [Inter Font](https://rsms.me/inter/) - 字体
 - [Selenium](https://www.selenium.dev/) - 自动化测试
-
-## 发布到 npm
-
-如果您是项目维护者，需要将包发布到 npm，请按照以下步骤操作：
-
-### 1. 登录 npm
-
-```bash
-npm login
-```
-
-### 2. 检查包名是否可用
-
-```bash
-npm view iflow-run
-```
-
-如果返回错误，说明包名可用。
-
-### 3. 更新版本号
-
-在 `package.json` 中更新版本号（遵循语义化版本规范）：
-
-```bash
-# 小版本更新（新功能，向后兼容）
-npm version minor
-
-# 补丁更新（bug 修复）
-npm version patch
-
-# 主版本更新（破坏性更改）
-npm version major
-```
-
-### 4. 发布包
-
-```bash
-npm publish
-```
-
-### 5. 验证发布
-
-```bash
-npm view iflow-run
-npm install -g iflow-run
-```
-
-### 注意事项
-
-- 确保在发布前已经通过测试
-- 检查 `.npmignore` 文件，排除不需要发布的文件
-- 发布后无法删除，只能弃用或更新
-- 建议先发布到 `npm publish --dry-run` 进行预检查

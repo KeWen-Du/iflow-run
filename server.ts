@@ -41,6 +41,35 @@ interface Session {
   file: string;
   mtime: Date;
   preview: string;
+  model?: string;
+  status?: 'success' | 'error' | 'unknown';
+  tokenUsage?: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  tags?: string[];
+}
+
+interface SessionMetadata {
+  model: string | null;
+  status: 'success' | 'error' | 'unknown';
+  tokenUsage: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  hasError: boolean;
+}
+
+interface TagData {
+  color: string;
+  count: number;
+}
+
+interface TagsStore {
+  tags: Record<string, TagData>;
+  sessionTags: Record<string, string[]>;
 }
 
 interface Project {
@@ -76,6 +105,7 @@ if (!IFLOW_DIR) {
   IFLOW_DIR = path.join(homeDir, '.iflow');
 }
 const PROJECTS_DIR = path.join(IFLOW_DIR, 'projects');
+const TAGS_FILE = path.join(IFLOW_DIR, 'iflow-run-tags.json');
 
 // 缓存配置
 const CACHE_TTL = 5 * 60 * 1000;
@@ -87,7 +117,8 @@ const wsClients = new Set<WebSocket>();
 
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(currentDir, 'public')));
 
 // 创建 HTTP 服务器用于 WebSocket
@@ -201,6 +232,9 @@ app.get('/api/projects', async (req: Request, res: Response) => {
 
       if (sessionFiles.length === 0) continue;
 
+      // 加载标签数据
+      const tagsData = await readTagsData();
+
       const sessions: Session[] = [];
       for (const file of sessionFiles) {
         const sessionId = file.replace('.jsonl', '');
@@ -234,11 +268,22 @@ app.get('/api/projects', async (req: Request, res: Response) => {
           console.error(`Error reading session preview for ${file}:`, err);
         }
 
+        // 提取会话元数据
+        const metadata = await extractSessionMetadata(sessionFile);
+
+        // 获取会话标签
+        const sessionKey = `${dirent.name}/${sessionId}`;
+        const sessionTags = tagsData.sessionTags[sessionKey] || [];
+
         sessions.push({
           id: sessionId,
           file: file,
           mtime: mtime,
-          preview: preview
+          preview: preview,
+          model: metadata.model || undefined,
+          status: metadata.status,
+          tokenUsage: metadata.tokenUsage.total > 0 ? metadata.tokenUsage : undefined,
+          tags: sessionTags
         });
       }
 
@@ -686,98 +731,6 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
   }
 });
 
-// 获取统计数据 API
-app.get('/api/stats', async (req: Request, res: Response) => {
-  try {
-    const dirExists = await fs.access(PROJECTS_DIR).then(() => true).catch(() => false);
-    if (!dirExists) {
-      return res.json({
-        totalProjects: 0,
-        totalSessions: 0,
-        totalMessages: 0,
-        totalToolCalls: 0,
-        totalInputTokens: 0,
-        totalOutputTokens: 0,
-        toolUsageStats: {}
-      });
-    }
-
-    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
-    let totalSessions = 0;
-    let totalMessages = 0;
-    let totalToolCalls = 0;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    const toolUsageStats: Record<string, number> = {};
-
-    for (const project of entries) {
-      if (!project.isDirectory()) continue;
-
-      const projectPath = path.join(PROJECTS_DIR, project.name);
-      const files = await fs.readdir(projectPath);
-      const sessionFiles = files.filter(file => file.startsWith('session-') && file.endsWith('.jsonl'));
-
-      totalSessions += sessionFiles.length;
-
-      for (const file of sessionFiles) {
-        const sessionFile = path.join(projectPath, file);
-        try {
-          const content = await fs.readFile(sessionFile, 'utf8');
-          const lines = content.split('\n').filter(line => line.trim());
-
-          for (const line of lines) {
-            try {
-              const msg: Message = JSON.parse(line);
-              totalMessages++;
-
-              // 计算工具调用
-              if (msg.message?.content && Array.isArray(msg.message.content)) {
-                const toolCalls = msg.message.content.filter(c => c.type === 'tool_use');
-                totalToolCalls += toolCalls.length;
-
-                // 统计各工具使用次数
-                toolCalls.forEach(tc => {
-                  if (tc.name) {
-                    toolUsageStats[tc.name] = (toolUsageStats[tc.name] || 0) + 1;
-                  }
-                });
-              }
-
-              // 计算 Token 消耗
-              if (msg.message?.usage) {
-                totalInputTokens += msg.message.usage.input_tokens || 0;
-                totalOutputTokens += msg.message.usage.output_tokens || 0;
-              }
-            } catch {
-              // 跳过解析错误的消息
-            }
-          }
-        } catch {
-          // 跳过无法读取的文件
-        }
-      }
-    }
-
-    const totalTokens = totalInputTokens + totalOutputTokens;
-    const estimatedCost = (totalInputTokens * 0.001 / 1000) + (totalOutputTokens * 0.002 / 1000);
-
-    res.json({
-      totalProjects: entries.filter(e => e.isDirectory()).length,
-      totalSessions,
-      totalMessages,
-      totalToolCalls,
-      totalInputTokens,
-      totalOutputTokens,
-      totalTokens,
-      estimatedCost,
-      toolUsageStats
-    });
-  } catch (error) {
-    console.error('Error getting stats:', error);
-    res.status(500).json({ error: 'Failed to get stats', message: (error as Error).message });
-  }
-});
-
 // 删除会话 API
 app.delete('/api/sessions/:projectId/:sessionId', async (req: Request, res: Response) => {
   try {
@@ -812,6 +765,209 @@ app.delete('/api/sessions/:projectId/:sessionId', async (req: Request, res: Resp
   }
 });
 
+// ==================== v1.2.0 批量操作 API ====================
+
+// 批量删除会话
+app.post('/api/sessions/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { sessions } = req.body;
+    
+    if (!sessions || !Array.isArray(sessions) || sessions.length === 0) {
+      return res.status(400).json({ error: 'No sessions provided' });
+    }
+
+    const results: Array<{ projectId: string; sessionId: string; success: boolean; error?: string }> = [];
+    let deletedCount = 0;
+
+    for (const { projectId, sessionId } of sessions) {
+      try {
+        const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+        const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
+        
+        if (fileExists) {
+          await fs.unlink(sessionFile);
+          deletedCount++;
+          results.push({ projectId, sessionId, success: true });
+        } else {
+          results.push({ projectId, sessionId, success: false, error: 'Session not found' });
+        }
+      } catch (err) {
+        results.push({ projectId, sessionId, success: false, error: (err as Error).message });
+      }
+    }
+
+    // 清除缓存
+    projectsCache = null;
+    projectsCacheTime = 0;
+
+    // 通知客户端
+    broadcast({
+      type: 'sessions_batch_deleted',
+      count: deletedCount,
+      timestamp: Date.now()
+    });
+
+    res.json({ 
+      success: true, 
+      deletedCount, 
+      results 
+    });
+  } catch (error) {
+    console.error('Error batch deleting sessions:', error);
+    res.status(500).json({ error: 'Failed to batch delete sessions', message: (error as Error).message });
+  }
+});
+
+// ==================== v1.2.0 标签系统 API ====================
+
+// 获取所有标签
+app.get('/api/tags', async (req: Request, res: Response) => {
+  try {
+    const tagsData = await readTagsData();
+    
+    // 计算每个标签的使用次数
+    const tagCounts: Record<string, number> = {};
+    for (const sessionTags of Object.values(tagsData.sessionTags)) {
+      for (const tag of sessionTags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
+    }
+
+    // 更新标签计数
+    for (const tagName of Object.keys(tagsData.tags)) {
+      tagsData.tags[tagName].count = tagCounts[tagName] || 0;
+    }
+
+    res.json({
+      tags: tagsData.tags,
+      sessionTags: tagsData.sessionTags
+    });
+  } catch (error) {
+    console.error('Error getting tags:', error);
+    res.status(500).json({ error: 'Failed to get tags', message: (error as Error).message });
+  }
+});
+
+// 添加新标签
+app.post('/api/tags', async (req: Request, res: Response) => {
+  try {
+    const { name, color } = req.body;
+    
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'Tag name is required' });
+    }
+
+    const tagName = name.toLowerCase().trim();
+    const tagsData = await readTagsData();
+
+    if (tagsData.tags[tagName]) {
+      return res.status(400).json({ error: 'Tag already exists' });
+    }
+
+    tagsData.tags[tagName] = {
+      color: color || generateTagColor(),
+      count: 0
+    };
+
+    await saveTagsData(tagsData);
+
+    res.json({
+      success: true,
+      tag: { name: tagName, ...tagsData.tags[tagName] }
+    });
+  } catch (error) {
+    console.error('Error adding tag:', error);
+    res.status(500).json({ error: 'Failed to add tag', message: (error as Error).message });
+  }
+});
+
+// 删除标签
+app.delete('/api/tags/:name', async (req: Request, res: Response) => {
+  try {
+    const name = req.params.name;
+    const tagName = String(name).toLowerCase();
+
+    const tagsData = await readTagsData();
+
+    if (!tagsData.tags[tagName]) {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    // 删除标签定义
+    delete tagsData.tags[tagName];
+
+    // 从所有会话中移除该标签
+    for (const sessionKey of Object.keys(tagsData.sessionTags)) {
+      tagsData.sessionTags[sessionKey] = tagsData.sessionTags[sessionKey].filter(t => t !== tagName);
+    }
+
+    await saveTagsData(tagsData);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting tag:', error);
+    res.status(500).json({ error: 'Failed to delete tag', message: (error as Error).message });
+  }
+});
+
+// 获取会话标签
+app.get('/api/sessions/:projectId/:sessionId/tags', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.params;
+    const sessionKey = `${projectId}/${sessionId}`;
+
+    const tagsData = await readTagsData();
+    const tags = tagsData.sessionTags[sessionKey] || [];
+
+    res.json({ tags });
+  } catch (error) {
+    console.error('Error getting session tags:', error);
+    res.status(500).json({ error: 'Failed to get session tags', message: (error as Error).message });
+  }
+});
+
+// 设置会话标签
+app.post('/api/sessions/:projectId/:sessionId/tags', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.params;
+    const { tags } = req.body;
+    const sessionKey = `${projectId}/${sessionId}`;
+
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ error: 'Tags must be an array' });
+    }
+
+    const tagsData = await readTagsData();
+
+    // 标准化标签名称（小写）
+    const normalizedTags = tags.map(t => t.toLowerCase().trim()).filter(t => t);
+
+    // 确保所有标签都存在
+    for (const tagName of normalizedTags) {
+      if (!tagsData.tags[tagName]) {
+        tagsData.tags[tagName] = {
+          color: generateTagColor(),
+          count: 0
+        };
+      }
+    }
+
+    // 设置会话标签
+    tagsData.sessionTags[sessionKey] = normalizedTags;
+
+    await saveTagsData(tagsData);
+
+    // 清除缓存以更新标签计数
+    projectsCache = null;
+    projectsCacheTime = 0;
+
+    res.json({ success: true, tags: normalizedTags });
+  } catch (error) {
+    console.error('Error setting session tags:', error);
+    res.status(500).json({ error: 'Failed to set session tags', message: (error as Error).message });
+  }
+});
+
 // 提取消息内容
 function extractContent(msg: Message): string {
   if (!msg.message || !msg.message.content) return '';
@@ -824,6 +980,480 @@ function extractContent(msg: Message): string {
   }
   return JSON.stringify(content);
 }
+
+// ==================== v1.2.0 标签系统功能 ====================
+
+// 读取标签数据
+async function readTagsData(): Promise<TagsStore> {
+  try {
+    const fileExists = await fs.access(TAGS_FILE).then(() => true).catch(() => false);
+    if (!fileExists) {
+      return { tags: {}, sessionTags: {} };
+    }
+    const content = await fs.readFile(TAGS_FILE, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error reading tags data:', error);
+    return { tags: {}, sessionTags: {} };
+  }
+}
+
+// 保存标签数据
+async function saveTagsData(data: TagsStore): Promise<void> {
+  try {
+    await fs.writeFile(TAGS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving tags data:', error);
+    throw error;
+  }
+}
+
+// 生成随机颜色
+function generateTagColor(): string {
+  const colors = [
+    '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
+    '#22C55E', '#10B981', '#14B8A6', '#06B6D4', '#0EA5E9',
+    '#3B82F6', '#6366F1', '#8B5CF6', '#A855F7', '#D946EF',
+    '#EC4899', '#F43F5E'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// 提取会话元数据（模型、状态、Token 消耗）
+async function extractSessionMetadata(sessionFile: string): Promise<SessionMetadata> {
+  const defaultMetadata: SessionMetadata = {
+    model: null,
+    status: 'unknown',
+    tokenUsage: { input: 0, output: 0, total: 0 },
+    hasError: false
+  };
+
+  try {
+    const content = await fs.readFile(sessionFile, 'utf8');
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let hasError = false;
+    let model: string | null = null;
+
+    for (const line of lines) {
+      try {
+        const msg: Message = JSON.parse(line);
+
+        // 提取模型名称
+        if (msg.message?.model && !model) {
+          model = msg.message.model;
+        }
+
+        // 计算 Token 消耗
+        if (msg.message?.usage) {
+          totalInputTokens += msg.message.usage.input_tokens || 0;
+          totalOutputTokens += msg.message.usage.output_tokens || 0;
+        }
+
+        // 检测是否有错误
+        if (msg.message?.content && Array.isArray(msg.message.content)) {
+          const toolResults = msg.message.content.filter(c => c.type === 'tool_result');
+          for (const tr of toolResults) {
+            if (tr.is_error === true) {
+              hasError = true;
+            }
+          }
+        }
+      } catch {
+        // 跳过解析错误的消息
+      }
+    }
+
+    return {
+      model,
+      status: hasError ? 'error' : 'success',
+      tokenUsage: {
+        input: totalInputTokens,
+        output: totalOutputTokens,
+        total: totalInputTokens + totalOutputTokens
+      },
+      hasError
+    };
+  } catch (error) {
+    console.error('Error extracting session metadata:', error);
+    return defaultMetadata;
+  }
+}
+
+// ==================== v1.3.0 P1 AI 功能 API ====================
+
+// AI 配置存储路径
+const AI_CONFIG_FILE = path.join(IFLOW_DIR, 'iflow-run-ai-config.json');
+
+interface AIConfig {
+  provider: 'iflow' | 'openai';
+  apiKey: string;
+  model: string;
+  enabled: boolean;
+}
+
+// 读取 AI 配置
+async function readAIConfig(): Promise<AIConfig> {
+  try {
+    const fileExists = await fs.access(AI_CONFIG_FILE).then(() => true).catch(() => false);
+    if (!fileExists) {
+      return {
+        provider: 'iflow',
+        apiKey: '',
+        model: 'iflow-rome-30ba3b',
+        enabled: false
+      };
+    }
+    const content = await fs.readFile(AI_CONFIG_FILE, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error reading AI config:', error);
+    return {
+      provider: 'iflow',
+      apiKey: '',
+      model: 'iflow-rome-30ba3b',
+      enabled: false
+    };
+  }
+}
+
+// 保存 AI 配置
+async function saveAIConfig(config: AIConfig): Promise<void> {
+  try {
+    await fs.writeFile(AI_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving AI config:', error);
+    throw error;
+  }
+}
+
+// 获取 AI 配置 API
+app.get('/api/ai/config', async (req: Request, res: Response) => {
+  try {
+    const config = await readAIConfig();
+    // 不返回完整的 API Key，只返回是否存在
+    res.json({
+      provider: config.provider,
+      hasApiKey: !!config.apiKey,
+      apiKeyPreview: config.apiKey ? `${config.apiKey.substring(0, 8)}...` : '',
+      model: config.model,
+      enabled: config.enabled
+    });
+  } catch (error) {
+    console.error('Error getting AI config:', error);
+    res.status(500).json({ error: 'Failed to get AI config', message: (error as Error).message });
+  }
+});
+
+// 保存 AI 配置 API
+app.post('/api/ai/config', async (req: Request, res: Response) => {
+  try {
+    const { provider, apiKey, model, enabled } = req.body;
+    
+    const currentConfig = await readAIConfig();
+    
+    const newConfig: AIConfig = {
+      provider: provider || currentConfig.provider,
+      apiKey: apiKey !== undefined ? apiKey : currentConfig.apiKey,
+      model: model || currentConfig.model,
+      enabled: enabled !== undefined ? enabled : currentConfig.enabled
+    };
+    
+    await saveAIConfig(newConfig);
+    
+    res.json({
+      success: true,
+      config: {
+        provider: newConfig.provider,
+        hasApiKey: !!newConfig.apiKey,
+        model: newConfig.model,
+        enabled: newConfig.enabled
+      }
+    });
+  } catch (error) {
+    console.error('Error saving AI config:', error);
+    res.status(500).json({ error: 'Failed to save AI config', message: (error as Error).message });
+  }
+});
+
+// 测试 AI 连接 API
+app.post('/api/ai/test', async (req: Request, res: Response) => {
+  try {
+    const config = await readAIConfig();
+    
+    if (!config.apiKey) {
+      return res.status(400).json({ error: 'API Key not configured' });
+    }
+    
+    const baseUrl = config.provider === 'iflow' 
+      ? 'https://apis.iflow.cn/v1'
+      : 'https://api.openai.com/v1';
+    
+    // 发送测试请求
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 10
+      })
+    });
+    
+    if (response.ok) {
+      res.json({ success: true, message: 'API 连接成功' });
+    } else {
+      const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
+      res.status(400).json({ 
+        error: 'API 连接失败', 
+        message: errorData.error?.message || `HTTP ${response.status}`
+      });
+    }
+  } catch (error) {
+    console.error('Error testing AI connection:', error);
+    res.status(500).json({ error: 'Failed to test AI connection', message: (error as Error).message });
+  }
+});
+
+// AI 聊天 API（非流式）
+app.post('/api/ai/chat', async (req: Request, res: Response) => {
+  try {
+    const { messages, context } = req.body;
+    const config = await readAIConfig();
+    
+    if (!config.apiKey || !config.enabled) {
+      return res.status(400).json({ error: 'AI service not configured or disabled' });
+    }
+    
+    const baseUrl = config.provider === 'iflow' 
+      ? 'https://apis.iflow.cn/v1'
+      : 'https://api.openai.com/v1';
+    
+    // 构建系统消息
+    const systemMessage = {
+      role: 'system',
+      content: `你是 iFlow CLI 会话查看器的 AI 助手。你的任务是帮助用户理解和分析他们的 AI 会话记录。
+
+你可以：
+1. 分析当前会话的内容，提供摘要和关键决策
+2. 解释代码片段和工具调用
+3. 回答技术问题
+4. 提供优化建议
+
+${context ? `当前会话上下文：
+项目: ${context.projectName || '未知'}
+会话 ID: ${context.sessionId || '未知'}
+${context.sessionSummary ? `会话摘要: ${context.sessionSummary}` : ''}` : ''}
+
+请用中文回答，保持简洁专业。`
+    };
+    
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [systemMessage, ...messages],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as { error?: { message?: string }; status?: string; msg?: string };
+      // 支持 OpenAI 和 iflow 两种错误格式
+      const errorMsg = errorData.error?.message || errorData.msg || `HTTP ${response.status}`;
+      return res.status(response.status).json({ 
+        error: 'AI API error', 
+        message: errorMsg
+      });
+    }
+    
+    const data = await response.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; error?: any; status?: string; msg?: string };
+    
+    console.log('AI Chat API Response:', JSON.stringify(data, null, 2).substring(0, 500));
+    
+    if (!data.choices || data.choices.length === 0) {
+      // 支持 OpenAI 和 iflow 两种错误格式
+      const errorMsg = data.error?.message || data.msg || 'No choices in response';
+      console.error('AI Chat API empty choices. Full response:', JSON.stringify(data, null, 2));
+      return res.status(500).json({ error: 'AI API returned empty response', message: errorMsg });
+    }
+    
+    res.json({
+      success: true,
+      message: data.choices[0].message.content,
+      usage: data.usage
+    });
+  } catch (error) {
+    console.error('Error in AI chat:', error);
+    res.status(500).json({ error: 'Failed to chat with AI', message: (error as Error).message });
+  }
+});
+
+// 会话分析 API
+app.post('/api/ai/analyze', async (req: Request, res: Response) => {
+  try {
+    const { projectId, sessionId } = req.body;
+    const config = await readAIConfig();
+    
+    if (!config.apiKey || !config.enabled) {
+      return res.status(400).json({ error: 'AI service not configured or disabled' });
+    }
+    
+    // 读取会话内容
+    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
+    
+    if (!fileExists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    const content = await fs.readFile(sessionFile, 'utf8');
+    const messages = content.split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
+    
+    // 提取会话摘要信息
+    let summary = '';
+    let totalTokens = 0;
+    let toolCalls: string[] = [];
+    let errors = 0;
+    
+    for (const msg of messages) {
+      if (msg.type === 'user') {
+        const msgContent = extractContent(msg);
+        if (msgContent && !summary) {
+          summary = msgContent.substring(0, 500);
+        }
+      }
+      if (msg.message?.usage) {
+        totalTokens += (msg.message.usage.input_tokens || 0) + (msg.message.usage.output_tokens || 0);
+      }
+      if (msg.message?.content && Array.isArray(msg.message.content)) {
+        const tools = msg.message.content.filter((c: any) => c.type === 'tool_use').map((c: any) => c.name);
+        toolCalls.push(...tools);
+        const hasError = msg.message.content.some((c: any) => c.type === 'tool_result' && c.is_error);
+        if (hasError) errors++;
+      }
+    }
+    
+    // 构建分析提示
+    const analysisPrompt = `请分析以下 AI 会话记录，提供结构化的分析报告。
+
+会话基本信息：
+- 会话 ID: ${sessionId}
+- 消息数量: ${messages.length}
+- Token 消耗: ${totalTokens}
+- 工具调用次数: ${toolCalls.length}
+- 错误次数: ${errors}
+
+工具使用情况：
+${toolCalls.length > 0 ? [...new Set(toolCalls)].map(t => `- ${t}: ${toolCalls.filter(x => x === t).length} 次`).join('\n') : '- 无工具调用'}
+
+会话内容摘要：
+${summary || '（无摘要）'}
+
+请以 JSON 格式返回分析结果，包含以下字段：
+{
+  "summary": "会话摘要（2-3句话）",
+  "decisions": ["关键决策1", "关键决策2"],
+  "problems": ["解决的问题1", "解决的问题2"],
+  "stats": {
+    "efficiency": "效率评估（高/中/低）",
+    "complexity": "复杂度评估（高/中/低）",
+    "quality": "代码质量评估（高/中/低）"
+  },
+  "suggestions": ["改进建议1", "改进建议2"]
+}
+
+只返回 JSON，不要包含其他内容。`;
+
+    const baseUrl = config.provider === 'iflow' 
+      ? 'https://apis.iflow.cn/v1'
+      : 'https://api.openai.com/v1';
+    
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: analysisPrompt }],
+        temperature: 0.3,
+        max_tokens: 2000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as { error?: { message?: string }; status?: string; msg?: string };
+      // 支持 OpenAI 和 iflow 两种错误格式
+      const errorMsg = errorData.error?.message || errorData.msg || `HTTP ${response.status}`;
+      return res.status(response.status).json({ 
+        error: 'AI API error', 
+        message: errorMsg
+      });
+    }
+    
+    const data = await response.json() as { choices: Array<{ message: { content: string } }>; error?: any; status?: string; msg?: string };
+    
+    // 调试日志
+    console.log('AI API Response:', JSON.stringify(data, null, 2).substring(0, 500));
+    
+    if (!data.choices || data.choices.length === 0) {
+      // 支持 OpenAI 和 iflow 两种错误格式
+      const errorMsg = data.error?.message || data.msg || 'No choices in response';
+      console.error('AI API empty choices. Full response:', JSON.stringify(data, null, 2));
+      return res.status(500).json({ error: 'AI API returned empty response', message: errorMsg });
+    }
+    
+    const analysisText = data.choices[0].message.content;
+    
+    // 解析 JSON 结果
+    let analysis;
+    try {
+      // 尝试提取 JSON 内容
+      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        analysis = { summary: analysisText, decisions: [], problems: [], stats: {}, suggestions: [] };
+      }
+    } catch {
+      analysis = { summary: analysisText, decisions: [], problems: [], stats: {}, suggestions: [] };
+    }
+    
+    res.json({
+      success: true,
+      analysis: {
+        ...analysis,
+        metadata: {
+          sessionId,
+          projectId,
+          messageCount: messages.length,
+          totalTokens,
+          toolCallCount: toolCalls.length,
+          errorCount: errors,
+          topTools: [...new Set(toolCalls)].slice(0, 5).map(t => ({
+            name: t,
+            count: toolCalls.filter(x => x === t).length
+          }))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error analyzing session:', error);
+    res.status(500).json({ error: 'Failed to analyze session', message: (error as Error).message });
+  }
+});
 
 // 检测端口是否可用
 function isPortAvailable(port: number): Promise<boolean> {
@@ -866,6 +1496,28 @@ async function findAvailablePort(startPort: number): Promise<number> {
   throw new Error(`Unable to find available port after ${maxAttempts} attempts`);
 }
 
+// PID 文件和状态文件路径（用于后台运行模式）
+const homeDir = os.homedir();
+const iflowRunDir = path.join(homeDir, '.iflow-run');
+const statusFile = path.join(iflowRunDir, 'iflow-run.status');
+
+// 写入状态文件（用于后台运行模式显示端口）
+function writeStatusFile(port: number): void {
+  try {
+    // 确保目录存在
+    if (!fsSync.existsSync(iflowRunDir)) {
+      fsSync.mkdirSync(iflowRunDir, { recursive: true });
+    }
+    fsSync.writeFileSync(statusFile, JSON.stringify({
+      port,
+      pid: process.pid,
+      startTime: Date.now()
+    }), 'utf8');
+  } catch (error) {
+    console.error('Failed to write status file:', (error as Error).message);
+  }
+}
+
 // 启动服务器
 (async () => {
   try {
@@ -881,6 +1533,9 @@ async function findAvailablePort(startPort: number): Promise<number> {
     server.listen(availablePort, () => {
       console.log(`iflow-run server running at http://localhost:${availablePort}`);
       console.log(`WebSocket server running at ws://localhost:${availablePort}/ws`);
+      
+      // 写入状态文件，供后台运行模式读取实际端口
+      writeStatusFile(availablePort);
     });
   } catch (error) {
     console.error('Failed to start server:', (error as Error).message);

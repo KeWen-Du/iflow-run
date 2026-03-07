@@ -12,6 +12,7 @@ const args = process.argv.slice(2);
 const homeDir = os.homedir();
 const iflowRunDir = path.join(homeDir, '.iflow-run');
 const pidFile = path.join(iflowRunDir, 'iflow-run.pid');
+const statusFile = path.join(iflowRunDir, 'iflow-run.status');
 
 // 确保 .iflow-run 目录存在
 if (!fs.existsSync(iflowRunDir)) {
@@ -100,12 +101,14 @@ function stopDaemon() {
           }
           console.log('后台服务已停止');
           fs.unlinkSync(pidFile);
+          if (fs.existsSync(statusFile)) fs.unlinkSync(statusFile);
           process.exit(0);
         });
       } else {
         process.kill(pid, 'SIGTERM');
         console.log('后台服务已停止');
         fs.unlinkSync(pidFile);
+        if (fs.existsSync(statusFile)) fs.unlinkSync(statusFile);
         process.exit(0);
       }
     } catch (err) {
@@ -114,9 +117,12 @@ function stopDaemon() {
     }
   } else {
     console.log('后台服务未运行');
-    // 清理过期的 PID 文件
+    // 清理过期的 PID 文件和状态文件
     if (fs.existsSync(pidFile)) {
       fs.unlinkSync(pidFile);
+    }
+    if (fs.existsSync(statusFile)) {
+      fs.unlinkSync(statusFile);
     }
     process.exit(0);
   }
@@ -128,6 +134,17 @@ function startDaemon(port, dir) {
   
   if (pid && isProcessRunning(pid)) {
     console.log('服务已经在后台运行');
+    // 尝试从状态文件读取端口信息
+    if (fs.existsSync(statusFile)) {
+      try {
+        const status = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+        console.log(`服务地址: http://localhost:${status.port}`);
+      } catch (err) {
+        console.log('默认地址: http://localhost:3000');
+      }
+    } else {
+      console.log('默认地址: http://localhost:3000');
+    }
     console.log('如需重启，请先使用: iflow-run --stop');
     process.exit(1);
   }
@@ -135,55 +152,39 @@ function startDaemon(port, dir) {
   console.log('正在启动后台服务...');
 
   if (process.platform === 'win32') {
-    // Windows 使用 start 命令启动新窗口
+    // Windows 使用 PowerShell 启动后台进程
     const nodePath = process.execPath;
-    const serverPath = path.join(__dirname, '..', 'server.js');
-    const portArg = port ? `IFLOW_RUN_PORT=${port} ` : '';
-    const dirArg = dir ? `IFLOW_RUN_DIR=${dir} ` : '';
+    const serverPath = path.join(__dirname, '..', 'dist', 'server.js');
     
-    const command = `start /B cmd /C "${portArg}${dirArg}"${nodePath}" "${serverPath}"`;
+    // 构建环境变量设置
+    const envVars = [];
+    if (port) envVars.push(`$env:IFLOW_RUN_PORT='${port}'`);
+    if (dir) envVars.push(`$env:IFLOW_RUN_DIR='${dir}'`);
     
-    exec(command, (error) => {
+    const envSetup = envVars.length > 0 ? envVars.join(';') + ';' : '';
+    const command = `powershell -WindowStyle Hidden -Command "${envSetup} Start-Process -FilePath '${nodePath}' -ArgumentList '${serverPath}' -WindowStyle Hidden -PassThru | Select-Object -ExpandProperty Id"`;
+    
+    exec(command, { maxBuffer: 1024 * 1024 }, (error, stdout) => {
       if (error) {
         console.error('启动失败:', error.message);
         process.exit(1);
       }
       
-      // 等待一段时间，然后查找新启动的进程
-      setTimeout(() => {
-        // 使用 tasklist 查找 iflow-run 相关的 node 进程
-        exec('tasklist /FI "IMAGENAME eq node.exe" /FO CSV', (err, stdout) => {
-          if (err) {
-            console.error('无法获取进程信息');
-            process.exit(1);
-          }
-          
-          // 解析输出，找到最新的 node 进程
-          const lines = stdout.split('\n').slice(1);
-          const pids = lines
-            .filter(line => line.includes('node.exe'))
-            .map(line => {
-              const parts = line.split(',');
-              return parseInt(parts[1].replace(/"/g, '').trim());
-            });
-          
-          if (pids.length > 0) {
-            // 取最大的 PID（最新启动的）
-            const newPid = Math.max(...pids);
-            fs.writeFileSync(pidFile, newPid.toString());
-            console.log('后台服务启动成功');
-            console.log('使用 "iflow-run --stop" 停止服务');
-          } else {
-            console.error('无法获取进程 PID');
-            process.exit(1);
-          }
-        });
-      }, 1000);
+      const newPid = parseInt(stdout.trim());
+      if (newPid > 0) {
+        fs.writeFileSync(pidFile, newPid.toString());
+        
+        // 等待状态文件生成，然后显示端口信息
+        waitForStatusAndShow(5000, port);
+      } else {
+        console.error('无法获取进程 PID');
+        process.exit(1);
+      }
     });
   } else {
     // Linux/Mac 使用 detached 模式
     const nodePath = process.execPath;
-    const serverPath = path.join(__dirname, '..', 'server.js');
+    const serverPath = path.join(__dirname, '..', 'dist', 'server.js');
     
     const env = { ...process.env };
     if (port) env.IFLOW_RUN_PORT = port;
@@ -197,10 +198,41 @@ function startDaemon(port, dir) {
     
     child.unref();
     fs.writeFileSync(pidFile, child.pid.toString());
-    console.log('后台服务启动成功');
-    console.log('使用 "iflow-run --stop" 停止服务');
-    process.exit(0);
+    
+    // 等待状态文件生成，然后显示端口信息
+    waitForStatusAndShow(5000, port);
   }
+}
+
+// 等待状态文件并显示端口信息
+function waitForStatusAndShow(timeout, requestedPort) {
+  const startTime = Date.now();
+  const checkInterval = 200;
+  
+  function checkStatus() {
+    if (fs.existsSync(statusFile)) {
+      try {
+        const status = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+        console.log('后台服务启动成功');
+        console.log(`服务地址: http://localhost:${status.port}`);
+        console.log('使用 "iflow-run --stop" 停止服务');
+        process.exit(0);
+      } catch (err) {
+        // 文件可能还在写入中，继续等待
+      }
+    }
+    
+    if (Date.now() - startTime < timeout) {
+      setTimeout(checkStatus, checkInterval);
+    } else {
+      console.log('后台服务启动成功');
+      console.log(`默认地址: http://localhost:${requestedPort || 3000}`);
+      console.log('使用 "iflow-run --stop" 停止服务');
+      process.exit(0);
+    }
+  }
+  
+  checkStatus();
 }
 
 // 处理参数

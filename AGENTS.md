@@ -4,11 +4,63 @@
 
 - **GitHub**: https://github.com/KeWen-Du/iflow-run
 - **npm**: https://www.npmjs.com/package/iflow-run
-- **版本**: 1.1.6
+- **版本**: 1.4.0
 - **作者**: dukewen <dukewen666@gmail.com>
 - **许可证**: MIT
 
 ## 更新日志
+
+### v1.3.0 (2026-03-07)
+
+**新功能 (P1 功能完成)**
+- 🤖 **AI 助手集成** - 集成心流开放平台/OpenAI API，支持 AI 对话、会话分析
+- 📊 **会话分析报告** - AI 自动分析会话，生成摘要、关键决策、问题解决过程和改进建议
+- 💬 **AI 助手侧边栏** - 在应用内直接与 AI 对话，支持快速分析和代码解释
+- ⚙️ **AI 服务配置** - 支持配置 API Key、选择服务商（心流/OpenAI）、选择模型
+- 🔗 **API 连接测试** - 在设置面板测试 AI API 连接状态
+- 📈 **Token 使用趋势图表** - 按日/周/月聚合展示 Token 使用趋势
+- 📊 **数据可视化仪表板** - 综合展示项目统计、工具使用、模型分布、活动热力图
+- 💾 **数据备份与恢复** - 支持导出和恢复用户数据（收藏、标签、设置）
+
+**API 新增**
+- `GET /api/ai/config` - 获取 AI 配置状态
+- `POST /api/ai/config` - 保存 AI 配置
+- `POST /api/ai/test` - 测试 AI API 连接
+- `POST /api/ai/chat` - AI 对话接口
+- `POST /api/ai/analyze` - 会话分析接口
+- `GET /api/stats/trends` - Token 使用趋势数据
+- `GET /api/dashboard` - 数据可视化仪表板数据
+- `GET /api/backup` - 导出用户数据备份
+- `POST /api/restore` - 恢复用户数据
+
+**优化**
+- 数据仪表板界面增强，展示更多统计数据
+- 会话详情页新增"分析会话"按钮
+- 支持 Markdown 格式的 AI 响应渲染
+- AI 配置持久化存储在 `~/.iflow/iflow-run-ai-config.json`
+
+### v1.2.0 (2026-03-03)
+
+**新功能**
+- 🏷️ **会话标签系统** - 为会话添加自定义标签，支持标签管理和筛选
+- 🔍 **高级筛选** - 按模型、状态（成功/有错误）、标签筛选会话
+- ✅ **批量操作模式** - 进入批量模式后可多选会话进行批量操作
+- 🗑️ **批量删除** - 一次性删除多个会话
+- 📥 **批量导出** - 批量导出多个会话为 JSON 或 Markdown 格式
+- 📊 **会话元数据** - 会话卡片显示模型名称、执行状态、Token 消耗信息
+
+**API 新增**
+- `POST /api/sessions/batch-delete` - 批量删除会话
+- `POST /api/sessions/batch-export` - 批量导出会话
+- `GET /api/tags` - 获取所有标签
+- `POST /api/tags` - 添加标签
+- `DELETE /api/tags/:name` - 删除标签
+- `GET /api/sessions/:projectId/:sessionId/tags` - 获取会话标签
+- `POST /api/sessions/:projectId/:sessionId/tags` - 设置会话标签
+
+**优化**
+- 会话列表增强：显示模型、状态、Token 消耗、标签等信息
+- 标签数据持久化存储在 `~/.iflow/iflow-run-tags.json`
 
 ### v1.1.6 (2026-03-03)
 
@@ -47,8 +99,11 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 
 - **项目管理**: 浏览和查看 iFlow CLI 创建的所有项目
 - **会话浏览**: 查看每个项目下的所有会话历史
-- **会话收藏**: 收藏重要会话，收藏的会话显示在列表顶部 ⭐ NEW
-- **会话删除**: 删除不需要的会话文件 🗑️ NEW
+- **会话收藏**: 收藏重要会话，收藏的会话显示在列表顶部 ⭐
+- **会话删除**: 删除不需要的会话文件 🗑️
+- **会话标签**: 为会话添加自定义标签，支持标签筛选 🏷️
+- **高级筛选**: 按模型、状态、标签筛选会话 🔍
+- **批量操作**: 批量选择、删除、导出会话 ✅
 - **消息详情**: 查看完整的对话消息，包括用户消息、助手响应、工具调用和工具结果
 - **预览功能**: 快速预览会话的第一条消息内容
 - **会话上下文**: 显示工作目录、Git 分支、版本信息等环境上下文
@@ -56,14 +111,15 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 - **消息内搜索**: 在会话详情中搜索消息内容
 - **Token 统计**: 显示模型名称、Token 消耗、执行时间和预估成本
 - **使用统计**: 统计面板显示项目、会话、消息、工具调用和 Token 消耗总量
-- **工具使用统计**: 可视化展示工具调用次数统计图表 📊 NEW
+- **工具使用统计**: 可视化展示工具调用次数统计图表 📊
 - **环境追踪**: 检测并显示工作目录和 Git 分支的变更
 - **导出功能**: 支持导出会话为 Markdown 或 JSON 格式
+- **批量导出**: 批量导出多个会话 📥
 - **消息目录**: 快速导航到用户消息
 - **打开 iflow**: 在会话工作目录打开终端并执行 iflow 命令
 - **打开目录**: 在系统文件管理器中打开项目目录
 - **打开工作目录**: 在系统文件管理器中打开会话的工作目录
-- **用户设置面板**: 自定义主题、显示数量、默认筛选等偏好设置 ⚙️ NEW
+- **用户设置面板**: 自定义主题、显示数量、默认筛选等偏好设置 ⚙️
 - **跳转底部**: 快速跳转到最后一条消息
 - **后台运行**: 支持后台运行服务，方便长期使用
 - **端口自动检测**: 自动检测端口占用并使用下一个可用端口
@@ -71,6 +127,9 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 - **Markdown 渲染**: 支持 Markdown 格式消息的渲染和代码高亮
 - **键盘快捷键**: 支持键盘快捷键操作，提升使用效率
 - **实时更新**: 通过 WebSocket 实时监听会话文件变更
+- **AI 助手**: 集成 AI 对话和会话分析功能 🤖 NEW
+- **数据仪表板**: 综合数据可视化和统计图表 📊 NEW
+- **数据备份恢复**: 导出和恢复用户数据 💾 NEW
 
 ### 技术栈
 
@@ -79,11 +138,11 @@ iflow-run 是一个用于查看 iFlow CLI 会话轨迹和历史会话的 Web 应
 - **样式**: 自定义 CSS，使用现代暗色主题设计
 - **模块系统**: CommonJS
 - **开发工具**:
-  - TypeScript (5.9.3) - 类型安全的 JavaScript 超集
-  - Vite (7.3.1) - 现代化的前端构建工具
-  - ESLint (10.0.2) - JavaScript 代码检查工具
-  - Prettier (3.8.1) - 代码格式化工具
-  - tsx (4.19.2) - TypeScript 执行和监视工具
+  - TypeScript (^5.9.3) - 类型安全的 JavaScript 超集
+  - Vite (^7.3.1) - 现代化的前端构建工具
+  - ESLint (^10.0.2) - JavaScript 代码检查工具
+  - Prettier (^3.8.1) - 代码格式化工具
+  - tsx (^4.19.2) - TypeScript 执行和监视工具
 - **运行时依赖**:
   - express (^4.18.2) - Web 服务器框架
   - cors (^2.8.5) - 跨域资源共享支持
@@ -506,6 +565,384 @@ node server.js --dir=/path/to/.iflow
 }
 ```
 
+### 批量删除会话
+
+**端点**: `POST /api/sessions/batch-delete`
+
+**描述**: 批量删除多个会话文件
+
+**请求体**:
+```json
+{
+  "sessions": [
+    { "projectId": "project-id-1", "sessionId": "session-1" },
+    { "projectId": "project-id-1", "sessionId": "session-2" }
+  ]
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "deletedCount": 2,
+  "results": [
+    { "projectId": "project-id-1", "sessionId": "session-1", "success": true },
+    { "projectId": "project-id-1", "sessionId": "session-2", "success": true }
+  ]
+}
+```
+
+### 批量导出会话
+
+**端点**: `POST /api/sessions/batch-export`
+
+**描述**: 批量导出多个会话为 JSON 或 Markdown 格式
+
+**请求体**:
+```json
+{
+  "sessions": [
+    { "projectId": "project-id-1", "sessionId": "session-1" }
+  ],
+  "format": "json"
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "count": 1,
+  "sessions": [
+    {
+      "projectId": "project-id-1",
+      "sessionId": "session-1",
+      "filename": "session-1.json",
+      "content": "..."
+    }
+  ]
+}
+```
+
+### 获取所有标签
+
+**端点**: `GET /api/tags`
+
+**描述**: 获取所有标签和会话标签映射
+
+**响应示例**:
+```json
+{
+  "tags": {
+    "react": { "color": "#61DAFB", "count": 5 },
+    "bugfix": { "color": "#EF4444", "count": 3 }
+  },
+  "sessionTags": {
+    "project-id/session-1": ["react", "bugfix"]
+  }
+}
+```
+
+### 添加标签
+
+**端点**: `POST /api/tags`
+
+**描述**: 添加新标签
+
+**请求体**:
+```json
+{
+  "name": "react",
+  "color": "#61DAFB"
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "tag": { "name": "react", "color": "#61DAFB", "count": 0 }
+}
+```
+
+### 删除标签
+
+**端点**: `DELETE /api/tags/:name`
+
+**描述**: 删除标签并从所有会话中移除
+
+**响应示例**:
+```json
+{
+  "success": true
+}
+```
+
+### 获取会话标签
+
+**端点**: `GET /api/sessions/:projectId/:sessionId/tags`
+
+**描述**: 获取指定会话的标签列表
+
+**响应示例**:
+```json
+{
+  "tags": ["react", "bugfix"]
+}
+```
+
+### 设置会话标签
+
+**端点**: `POST /api/sessions/:projectId/:sessionId/tags`
+
+**描述**: 设置指定会话的标签
+
+**请求体**:
+```json
+{
+  "tags": ["react", "feature"]
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "tags": ["react", "feature"]
+}
+```
+
+### Token 使用趋势 (v1.3.0)
+
+**端点**: `GET /api/stats/trends`
+
+**描述**: 获取 Token 使用趋势数据
+
+**查询参数**:
+- `period` (string): 时间粒度，可选值：`day`、`week`、`month`，默认 `day`
+- `days` (number): 时间范围（天），默认 30
+
+**响应示例**:
+```json
+{
+  "trends": [
+    {
+      "date": "2024-01-01",
+      "inputTokens": 5000,
+      "outputTokens": 2500,
+      "totalTokens": 7500,
+      "sessionCount": 5
+    }
+  ],
+  "period": "day",
+  "days": 30
+}
+```
+
+### 数据可视化仪表板 (v1.3.0)
+
+**端点**: `GET /api/dashboard`
+
+**描述**: 获取仪表板统计数据，包括概览、趋势、工具统计、模型分布、活动热力图
+
+**响应示例**:
+```json
+{
+  "overview": {
+    "totalProjects": 10,
+    "totalSessions": 50,
+    "totalMessages": 1000,
+    "totalToolCalls": 500,
+    "totalInputTokens": 50000,
+    "totalOutputTokens": 25000,
+    "estimatedCost": 0.1
+  },
+  "trends": [...],
+  "topTools": [
+    { "name": "read_file", "count": 100 },
+    { "name": "write_file", "count": 50 }
+  ],
+  "topModels": [
+    { "name": "glm-4.7", "count": 100, "tokens": 50000 }
+  ],
+  "activityHeatmap": [
+    { "date": "2024-01-01", "count": 5 }
+  ]
+}
+```
+
+### 数据备份 (v1.3.0)
+
+**端点**: `GET /api/backup`
+
+**描述**: 导出用户数据备份（收藏、标签、设置）
+
+**查询参数**:
+- `favorites` (string): 收藏列表，逗号分隔
+- `settings` (string): 用户设置 JSON
+
+**响应示例**:
+```json
+{
+  "version": "1.3.0",
+  "exportedAt": "2024-01-01T12:00:00.000Z",
+  "favorites": ["project-id/session-id"],
+  "tags": { ... },
+  "settings": { ... }
+}
+```
+
+### 数据恢复 (v1.3.0)
+
+**端点**: `POST /api/restore`
+
+**描述**: 恢复用户数据
+
+**请求体**: 备份文件内容（JSON）
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "Data restored successfully",
+  "results": {
+    "tags": { "success": true, "count": 5 },
+    "favorites": ["project-id/session-id"],
+    "settings": { ... }
+  }
+}
+```
+
+### AI 配置 (v1.3.0)
+
+**端点**: `GET /api/ai/config`
+
+**描述**: 获取 AI 配置状态
+
+**响应示例**:
+```json
+{
+  "provider": "iflow",
+  "hasApiKey": true,
+  "apiKeyPreview": "sk-xxxxx...",
+  "model": "iflow-rome-30ba3b",
+  "enabled": true
+}
+```
+
+### 保存 AI 配置 (v1.3.0)
+
+**端点**: `POST /api/ai/config`
+
+**描述**: 保存 AI 配置
+
+**请求体**:
+```json
+{
+  "provider": "iflow",
+  "apiKey": "sk-xxxxx",
+  "model": "iflow-rome-30ba3b",
+  "enabled": true
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "config": { ... }
+}
+```
+
+### 测试 AI 连接 (v1.3.0)
+
+**端点**: `POST /api/ai/test`
+
+**描述**: 测试 AI API 连接
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "API 连接成功"
+}
+```
+
+### AI 对话 (v1.3.0)
+
+**端点**: `POST /api/ai/chat`
+
+**描述**: AI 对话接口
+
+**请求体**:
+```json
+{
+  "messages": [
+    { "role": "user", "content": "你好" }
+  ],
+  "context": {
+    "projectName": "项目名称",
+    "sessionId": "session-id"
+  }
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "AI 回复内容",
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150
+  }
+}
+```
+
+### 会话分析 (v1.3.0)
+
+**端点**: `POST /api/ai/analyze`
+
+**描述**: AI 分析会话内容
+
+**请求体**:
+```json
+{
+  "projectId": "project-id",
+  "sessionId": "session-id"
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "analysis": {
+    "summary": "会话摘要",
+    "decisions": ["关键决策1", "关键决策2"],
+    "problems": ["解决的问题1", "解决的问题2"],
+    "stats": {
+      "efficiency": "高",
+      "complexity": "中",
+      "quality": "高"
+    },
+    "suggestions": ["改进建议1", "改进建议2"],
+    "metadata": {
+      "sessionId": "session-id",
+      "messageCount": 50,
+      "totalTokens": 5000,
+      "toolCallCount": 20,
+      "errorCount": 0,
+      "topTools": [
+        { "name": "read_file", "count": 10 }
+      ]
+    }
+  }
+}
+```
+
 ## WebSocket 实时更新
 
 **端点**: `ws://localhost:3000/ws`
@@ -571,7 +1008,7 @@ node server.js --dir=/path/to/.iflow
 - **主题**: 采用现代暗色主题，支持暗色/亮色主题切换
 - **组件化**: 样式按组件组织，便于维护和复用
 
-### 设计系统 (v1.1.6)
+### 设计系统
 
 项目采用 **"Digital Currents (数字流光)"** 设计理念，体现数据流动与科技感的视觉语言。
 
@@ -642,6 +1079,15 @@ iflow-run [选项]
 2. IFLOW_RUN_* 环境变量
 3. PORT/IFLOW_DIR 环境变量
 4. 默认值（最低优先级）
+
+## 数据存储
+
+应用在 `~/.iflow/` 目录下存储以下配置文件：
+
+| 文件名 | 描述 |
+|--------|------|
+| `iflow-run-tags.json` | 会话标签数据 |
+| `iflow-run-ai-config.json` | AI 服务配置 |
 
 ## 测试
 
@@ -719,6 +1165,9 @@ npm install -g iflow-run
 - **静态文件**: `public` 目录作为静态文件根目录，提供前端资源
 - **缓存**: 项目列表数据缓存 5 分钟，如需刷新可点击刷新按钮
 - **实时连接**: WebSocket 连接状态通过右上角指示器显示，断开时自动重连
+- **终止 Node.js 进程**: ⚠️ 重要：当需要终止 Node.js 后台服务时，**只终止指定端口的后端服务**，不要终止所有 Node.js 进程。因为 iflow-cli 本身也是 Node.js 后台服务，终止所有 Node.js 进程会导致程序自杀。正确的做法是通过端口号定位并终止特定进程，例如：
+  - Windows: `netstat -ano | findstr :3000` 找到 PID，然后 `taskkill /PID <pid> /F`
+  - Linux/Mac: `lsof -i :3000` 找到 PID，然后 `kill <pid>`
 
 ## 常见问题
 
@@ -782,6 +1231,15 @@ A:
 - **打开项目目录**: 打开 `.iflow/projects/<projectId>` 目录，这是 iflow 存储会话数据的目录
 - **打开工作目录**: 打开会话中 `cwd` 字段指定的目录，这是用户实际工作的项目目录
 
+### Q: AI 助手功能如何配置？
+
+A: 在设置面板中配置 AI 服务：
+1. 选择服务商（心流开放平台 或 OpenAI）
+2. 输入 API Key
+3. 选择模型
+4. 点击"测试连接"验证配置
+5. 启用 AI 功能
+
 ## 未来改进方向
 
 > 详细的功能规划请参考 [PROJECT_PLAN.md](./docs/PROJECT_PLAN.md)
@@ -799,25 +1257,23 @@ A:
 - [x] 用户设置面板（v1.1.6）
 - [x] 工具使用统计图表（v1.1.6）
 - [x] 后端统计 API（v1.1.6）
+- [x] 添加更多筛选条件（按模型、按状态等）（v1.2.0）
+- [x] 支持批量操作（批量删除、批量导出多个会话）（v1.2.0）
+- [x] 会话标签系统（v1.2.0）
+- [x] Token 使用趋势图表（v1.3.0）
+- [x] 数据备份与恢复（v1.3.0）
+- [x] AI 助手集成（v1.3.0）
+- [x] 数据可视化仪表板（v1.3.0）
 
-### 计划中功能（v1.2.0）
+### 规划中功能（v1.4.0+）
 
-- [ ] 添加更多筛选条件（按模型、按状态等）
-- [ ] 支持批量操作（批量删除、批量导出多个会话）
-- [ ] 会话标签系统
-
-### 规划中功能（v1.3.0+）
-
-- [ ] Token 使用趋势图表
-- [ ] 数据备份与恢复
-- [ ] 会话分享功能
-- [ ] AI 助手集成
-- [ ] 数据可视化仪表板
+- [ ] 多语言界面支持
+- [ ] 会话比较功能
+- [ ] PWA 离线支持
+- [ ] 插件系统
 
 ### 远期规划（v2.0.0）
 
-- [ ] 支持多语言界面
-- [ ] 支持会话比较功能
-- [ ] PWA 离线支持
-- [ ] 插件系统
-- [ ] 添加单元测试和 E2E 测试
+- [ ] 完整的单元测试和 E2E 测试覆盖
+- [ ] 协作功能（团队共享、权限管理）
+- [ ] 高级数据分析（AI 趋势预测、效率建议）

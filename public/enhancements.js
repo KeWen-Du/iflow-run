@@ -315,31 +315,8 @@ function setupKeyboardShortcuts() {
     }
   }, '刷新');
 
-  // Ctrl/Cmd + E: 导出当前会话
-  keyboardShortcuts.register('Ctrl+E', () => {
-    const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
-    if (exportMarkdownBtn) {
-      exportMarkdownBtn.click();
-    }
-  }, '导出为 Markdown');
-
-  // Ctrl/Cmd + Shift + E: 导出为 JSON
-  keyboardShortcuts.register('Ctrl+Shift+E', () => {
-    const exportJsonBtn = document.getElementById('exportJsonBtn');
-    if (exportJsonBtn) {
-      exportJsonBtn.click();
-    }
-  }, '导出为 JSON');
-
   // Esc: 关闭模态框/面板
   keyboardShortcuts.register('Escape', () => {
-    // 关闭统计面板
-    const statsModal = document.getElementById('statsModal');
-    if (statsModal && statsModal.classList.contains('active')) {
-      statsModal.classList.remove('active');
-      return;
-    }
-
     // 关闭消息目录
     const messageIndexPanel = document.getElementById('messageIndexPanel');
     if (messageIndexPanel && !messageIndexPanel.classList.contains('hidden')) {

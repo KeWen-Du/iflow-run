@@ -44,18 +44,21 @@
       <header class="header">
         <h1 id="currentProjectTitle" class="project-title">选择一个项目</h1>
         <div class="header-actions">
-          <div class="search-box">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="M21 21l-4.35-4.35"/>
-            </svg>
-            <input type="text" id="searchInput" placeholder="搜索会话..." />
+          <div class="search-container">
+            <button id="searchToggleBtn" class="btn btn-icon" title="搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </button>
+            <div class="search-box hidden" id="searchBox">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <input type="text" id="searchInput" placeholder="搜索会话..." autocomplete="off" />
+            </div>
           </div>
-          <button id="statsBtn" class="btn btn-icon" title="统计">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 20V10M12 20V4M6 20v-6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
           <button id="themeBtn" class="btn btn-icon" title="切换主题">
             <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"/>
@@ -72,14 +75,65 @@
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
+          <button id="batchModeBtn" class="btn btn-icon" title="批量操作模式">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          </button>
           <button id="settingsBtn" class="btn btn-icon" title="设置">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
           </button>
+          <button id="aiAssistantBtn" class="btn btn-icon" title="AI 助手">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A1.5 1.5 0 0 0 6 14.5 1.5 1.5 0 0 0 7.5 16 1.5 1.5 0 0 0 9 14.5 1.5 1.5 0 0 0 7.5 13m9 0a1.5 1.5 0 0 0-1.5 1.5 1.5 1.5 0 0 0 1.5 1.5 1.5 1.5 0 0 0 1.5-1.5 1.5 1.5 0 0 0-1.5-1.5M12 17c-2 0-3 1-3 1h6s-1-1-3-1z"/>
+            </svg>
+          </button>
         </div>
       </header>
+
+      <!-- 高级筛选面板 (v1.2.0) -->
+      <div id="advancedFilterPanel" class="advanced-filter-panel hidden">
+        <div class="filter-row">
+          <div class="filter-item">
+            <label>模型</label>
+            <select id="modelFilter" class="filter-select">
+              <option value="">全部模型</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>状态</label>
+            <select id="statusFilter" class="filter-select">
+              <option value="">全部状态</option>
+              <option value="success">成功</option>
+              <option value="error">有错误</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>标签</label>
+            <select id="tagFilter" class="filter-select">
+              <option value="">全部标签</option>
+            </select>
+          </div>
+          <button id="resetFiltersBtn" class="btn btn-secondary btn-small">重置</button>
+        </div>
+      </div>
+
+      <!-- 批量操作面板 (v1.2.0) -->
+      <div id="batchActionsPanel" class="batch-actions-panel hidden">
+        <div class="batch-actions-content">
+          <span class="batch-info">已选择 <strong id="selectedCount">0</strong> 个会话</span>
+          <div class="batch-actions-buttons">
+            <button id="selectAllBtn" class="btn btn-secondary btn-small">全选</button>
+            <button id="batchDeleteBtn" class="btn btn-danger btn-small">🗑️ 批量删除</button>
+          </div>
+        </div>
+      </div>
 
       <!-- 会话列表 -->
       <div id="sessionsContainer" class="sessions-container">
@@ -141,18 +195,26 @@
             <span id="sessionTime" class="session-time"></span>
           </div>
           <div class="session-actions">
-            <div class="message-search-box">
-              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="M21 21l-4.35-4.35"/>
-              </svg>
-              <input type="text" id="messageSearchInput" placeholder="搜索消息..." />
-              <button id="clearMessageSearch" class="btn btn-icon" style="width: 28px; height: 28px; padding: 0; display: none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                  <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
-                  <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+            <div class="message-search-container">
+              <button id="messageSearchToggleBtn" class="btn btn-icon" title="搜索消息">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="M21 21l-4.35-4.35"/>
                 </svg>
               </button>
+              <div class="message-search-box hidden" id="messageSearchBox">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" id="messageSearchInput" placeholder="搜索消息..." autocomplete="off" />
+                <button id="clearMessageSearch" class="btn btn-icon" style="width: 28px; height: 28px; padding: 0; display: none;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                    <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+                    <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             <select id="messageFilter" class="btn btn-secondary" style="padding: 8px 12px;">
               <option value="all">全部消息</option>
@@ -160,22 +222,6 @@
               <option value="assistant">助手消息</option>
               <option value="tools">工具调用</option>
             </select>
-            <button id="exportMarkdownBtn" class="btn btn-secondary" title="导出为 Markdown">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
-                <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Markdown
-            </button>
-            <button id="exportJsonBtn" class="btn btn-secondary" title="导出为 JSON">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
-                <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              JSON
-            </button>
             <button id="openIflowBtn" class="btn btn-primary" title="在工作目录打开 iflow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
                 <polyline points="4 17 10 11 4 5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -194,6 +240,13 @@
                 <path d="M12 5v14M19 12l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               底部
+            </button>
+            <button id="analyzeSessionBtn" class="btn btn-secondary" title="AI 分析此会话">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              分析
             </button>
             <button id="toggleMessageIndexBtn" class="btn btn-secondary" title="消息目录">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px;">
@@ -229,110 +282,6 @@
     <div class="ws-status-indicator" id="wsStatusIndicator"></div>
     <span id="wsStatusText">实时连接</span>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/marked@17.0.3/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="app.js"></script>
-  <script src="enhancements.js"></script>
-
-<!-- 统计面板模态框 -->
-<div id="statsModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>使用统计</h2>
-      <button id="closeStatsBtn" class="btn btn-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value" id="totalProjects">0</div>
-            <div class="stat-label">项目总数</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value" id="totalSessions">0</div>
-            <div class="stat-label">会话总数</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value" id="totalMessages">0</div>
-            <div class="stat-label">消息总数</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value" id="totalToolCalls">0</div>
-            <div class="stat-label">工具调用次数</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value" id="totalTokens">0</div>
-            <div class="stat-label">Token 总消耗</div>
-          </div>
-        </div>
-      </div>
-      <div class="token-breakdown" style="margin-top: 20px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
-        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Token 消耗明细</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-          <div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">输入 Token</div>
-            <div style="font-size: 20px; font-weight: 700; color: var(--accent-primary);" id="totalInputTokens">0</div>
-          </div>
-          <div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">输出 Token</div>
-            <div style="font-size: 20px; font-weight: 700; color: var(--success);" id="totalOutputTokens">0</div>
-          </div>
-          <div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">预估成本 (USD)</div>
-            <div style="font-size: 20px; font-weight: 700; color: var(--text-secondary);" id="estimatedCost">$0.00</div>
-          </div>
-        </div>
-      </div>
-      <!-- 工具使用统计图表 -->
-      <div class="tool-stats-section" style="margin-top: 20px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
-        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">🔧 工具使用统计</h3>
-        <div id="toolStatsChart" class="tool-stats-chart">
-          <div style="color: var(--text-muted); text-align: center; padding: 20px;">加载中...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- 设置面板模态框 -->
 <div id="settingsModal" class="modal">
@@ -395,15 +344,48 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+      </div>
+      <div class="settings-section">
+        <h3 class="settings-section-title">🤖 AI 服务配置</h3>
         <div class="setting-item">
           <label class="setting-label">
-            <span>显示工具统计图表</span>
+            <span>API 服务商</span>
+          </label>
+          <select id="settingAiProvider" class="setting-select">
+            <option value="iflow">心流开放平台 (iflow.cn)</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>API Key</span>
+          </label>
+          <div style="display: flex; gap: 8px; flex: 1;">
+            <input type="password" id="settingApiKey" class="setting-input" placeholder="输入 API Key..." style="flex: 1; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);">
+            <button id="testApiConnectionBtn" class="btn btn-secondary btn-small">测试连接</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>AI 模型</span>
+          </label>
+          <select id="settingAiModel" class="setting-select">
+            <option value="iflow-rome-30ba3b">iFlow-ROME-30B (推荐)</option>
+            <option value="qwen3-coder-plus">Qwen3-Coder-Plus</option>
+            <option value="qwen3-max">Qwen3-Max</option>
+            <option value="kimi-k2-0905">Kimi-K2</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">
+            <span>启用 AI 助手</span>
           </label>
           <label class="toggle-switch">
-            <input type="checkbox" id="settingShowToolStats" checked>
+            <input type="checkbox" id="settingEnableAiAssistant">
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div id="apiConnectionStatus" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -413,6 +395,128 @@
   </div>
 </div>
 
+<!-- AI 助手侧边栏 (v1.3.0 P1) -->
+<div id="aiAssistantPanel" class="ai-assistant-panel hidden">
+  <div class="ai-assistant-header">
+    <div class="ai-assistant-title">
+      <span class="ai-icon">🤖</span>
+      <span>AI 助手</span>
+    </div>
+    <div class="ai-assistant-actions">
+      <button id="aiNewChatBtn" class="btn btn-icon btn-small" title="新建会话" style="width: 28px; height: 28px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+          <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button id="aiClearContextBtn" class="btn btn-icon btn-small" title="清除上下文" style="width: 28px; height: 28px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+          <polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button id="closeAiAssistantBtn" class="btn btn-icon" style="width: 28px; height: 28px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+          <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div id="aiChatMessages" class="ai-chat-messages">
+    <div class="ai-welcome-message">
+      <div class="ai-welcome-icon">👋</div>
+      <div class="ai-welcome-text">
+        <p>你好！我是 AI 助手，可以帮助你：</p>
+        <ul>
+          <li>分析当前会话内容</li>
+          <li>解释代码和工具调用</li>
+          <li>回答技术问题</li>
+          <li>提供建议和优化方案</li>
+        </ul>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">请先在设置中配置 API Key 以启用 AI 功能</p>
+      </div>
+    </div>
+  </div>
+  <div class="ai-chat-input-area">
+    <div class="ai-quick-actions">
+      <button class="ai-quick-action-btn" data-action="analyze">📊 分析当前会话</button>
+      <button class="ai-quick-action-btn" data-action="explain">💡 解释选中内容</button>
+    </div>
+    <div class="ai-chat-input-wrapper">
+      <textarea id="aiChatInput" placeholder="输入消息... (Shift+Enter 换行)" rows="1"></textarea>
+      <button id="aiSendBtn" class="btn btn-primary btn-small" title="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+          <line x1="22" y1="2" x2="11" y2="13" stroke-linecap="round" stroke-linejoin="round"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 会话分析报告模态框 (v1.3.0 P1) -->
+<div id="analysisModal" class="modal">
+  <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-header">
+      <h2>📊 会话分析报告</h2>
+      <button id="closeAnalysisBtn" class="btn btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="analysisLoading" style="text-align: center; padding: 60px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔄</div>
+        <p style="color: var(--text-secondary);">AI 正在分析会话内容...</p>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">这可能需要几秒钟</p>
+      </div>
+      <div id="analysisResult" style="display: none;">
+        <!-- 摘要 -->
+        <div class="analysis-section">
+          <h3 class="analysis-section-title">📝 会话摘要</h3>
+          <div id="analysisSummary" class="analysis-content"></div>
+        </div>
+        <!-- 关键决策 -->
+        <div class="analysis-section">
+          <h3 class="analysis-section-title">🎯 关键决策</h3>
+          <div id="analysisDecisions" class="analysis-content"></div>
+        </div>
+        <!-- 问题解决 -->
+        <div class="analysis-section">
+          <h3 class="analysis-section-title">🔧 问题解决过程</h3>
+          <div id="analysisProblems" class="analysis-content"></div>
+        </div>
+        <!-- 效率统计 -->
+        <div class="analysis-section">
+          <h3 class="analysis-section-title">📈 效率统计</h3>
+          <div id="analysisStats" class="analysis-stats-grid"></div>
+        </div>
+        <!-- 建议 -->
+        <div class="analysis-section">
+          <h3 class="analysis-section-title">💡 改进建议</h3>
+          <div id="analysisSuggestions" class="analysis-content"></div>
+        </div>
+      </div>
+      <div id="analysisError" style="display: none; text-align: center; padding: 40px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+        <p style="color: var(--text-secondary); margin-bottom: 8px;">分析失败</p>
+        <p id="analysisErrorMsg" style="color: var(--text-muted); font-size: 12px;"></p>
+      </div>
+    </div>
+    <div class="modal-footer" id="analysisFooter" style="display: none;">
+      <button id="exportAnalysisBtn" class="btn btn-secondary">导出报告</button>
+      <button id="reanalyzeBtn" class="btn btn-primary">重新分析</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts - 必须放在 body 末尾，确保所有 DOM 元素已加载 -->
+<script src="https://cdn.jsdelivr.net/npm/marked@17.0.3/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="app.js"></script>
+<script src="enhancements.js"></script>
 
 </body>
 </html>

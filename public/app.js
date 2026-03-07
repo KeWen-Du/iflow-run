@@ -13,6 +13,17 @@ let isLoadingMore = false;
 let messageFilter = 'all'; // 消息类型筛选：all, user, assistant, tools
 let currentSearchQuery = ''; // 当前搜索查询
 
+// ==================== v1.2.0 新增功能状态 ====================
+let selectedSessions = new Set(); // 批量选择的会话
+let isBatchMode = false; // 批量操作模式
+let advancedFilters = {
+  model: '', // 模型筛选
+  status: '', // 状态筛选：success, error, all
+  tag: '' // 标签筛选
+};
+let allTags = {}; // 所有标签数据
+let allModels = new Set(); // 所有模型列表
+
 // ==================== 会话收藏功能 ====================
 const FAVORITES_KEY = 'iflow-run-favorites';
 
@@ -67,7 +78,6 @@ const DEFAULT_SETTINGS = {
   theme: 'dark',
   pageSize: 20,
   autoRefresh: true,
-  showToolStats: true,
   defaultMessageFilter: 'all'
 };
 
@@ -97,10 +107,9 @@ const currentProjectTitle = document.getElementById('currentProjectTitle');
 const backBtn = document.getElementById('backBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const searchInput = document.getElementById('searchInput');
-const statsBtn = document.getElementById('statsBtn');
+const searchToggleBtn = document.getElementById('searchToggleBtn');
+const searchBox = document.getElementById('searchBox');
 const themeBtn = document.getElementById('themeBtn');
-const exportMarkdownBtn = document.getElementById('exportMarkdownBtn');
-const exportJsonBtn = document.getElementById('exportJsonBtn');
 const openIflowBtn = document.getElementById('openIflowBtn');
 const openDirectoryBtn = document.getElementById('openDirectoryBtn');
 const openWorkdirBtn = document.getElementById('openWorkdirBtn');
@@ -109,8 +118,6 @@ const toggleMessageIndexBtn = document.getElementById('toggleMessageIndexBtn');
 const messageIndexPanel = document.getElementById('messageIndexPanel');
 const closeMessageIndexBtn = document.getElementById('closeMessageIndexBtn');
 const messageIndexList = document.getElementById('messageIndexList');
-const statsModal = document.getElementById('statsModal');
-const closeStatsBtn = document.getElementById('closeStatsBtn');
 
 // 工具配置
 const TOOL_CONFIG = {
@@ -306,6 +313,9 @@ async function init() {
 
   await loadProjects();
   setupEventListeners();
+  
+  // 初始化 v1.2.0 新功能
+  await initV120Features();
 }
 
 // 设置事件监听
@@ -331,6 +341,31 @@ function setupEventListeners() {
     });
   }
 
+  // 搜索按钮点击显示/隐藏搜索框
+  if (searchToggleBtn && searchBox) {
+    searchToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = searchBox.classList.toggle('hidden');
+      if (!isHidden) {
+        searchInput.focus();
+      }
+    });
+
+    // 点击其他地方关闭搜索框
+    document.addEventListener('click', (e) => {
+      if (!searchBox.contains(e.target) && !searchToggleBtn.contains(e.target)) {
+        searchBox.classList.add('hidden');
+      }
+    });
+
+    // ESC键关闭搜索框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !searchBox.classList.contains('hidden')) {
+        searchBox.classList.add('hidden');
+      }
+    });
+  }
+
   // 搜索功能
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -339,58 +374,11 @@ function setupEventListeners() {
     });
   }
 
-  // 统计面板
-  if (statsBtn) {
-    statsBtn.addEventListener('click', () => {
-      showStatsModal();
-    });
-  }
-
-  if (closeStatsBtn) {
-    closeStatsBtn.addEventListener('click', () => {
-      const statsModalEl = document.getElementById('statsModal');
-      if (statsModalEl) {
-        statsModalEl.classList.remove('active');
-      }
-    });
-  }
-
-  if (statsModal) {
-    statsModal.addEventListener('click', (e) => {
-      if (e.target === statsModal) {
-        statsModal.classList.remove('active');
-      }
-    });
-  } else {
-    // 如果全局变量为 null，尝试动态绑定
-    const statsModalEl = document.getElementById('statsModal');
-    if (statsModalEl) {
-      statsModalEl.addEventListener('click', (e) => {
-        if (e.target === statsModalEl) {
-          statsModalEl.classList.remove('active');
-        }
-      });
-    }
-  }
-
   // 主题切换
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
       document.body.classList.toggle('light-mode');
       localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
-    });
-  }
-
-  // 导出功能
-  if (exportMarkdownBtn) {
-    exportMarkdownBtn.addEventListener('click', () => {
-      exportAsMarkdown();
-    });
-  }
-
-  if (exportJsonBtn) {
-    exportJsonBtn.addEventListener('click', () => {
-      exportAsJson();
     });
   }
 
@@ -438,6 +426,34 @@ function setupEventListeners() {
   // 消息搜索功能
   const messageSearchInput = document.getElementById('messageSearchInput');
   const clearMessageSearch = document.getElementById('clearMessageSearch');
+  const messageSearchToggleBtn = document.getElementById('messageSearchToggleBtn');
+  const messageSearchBox = document.getElementById('messageSearchBox');
+
+  // 搜索按钮点击显示/隐藏搜索框
+  if (messageSearchToggleBtn && messageSearchBox) {
+    messageSearchToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = messageSearchBox.classList.toggle('hidden');
+      if (!isHidden && messageSearchInput) {
+        messageSearchInput.focus();
+      }
+    });
+
+    // 点击其他地方关闭搜索框
+    document.addEventListener('click', (e) => {
+      if (!messageSearchBox.contains(e.target) && !messageSearchToggleBtn.contains(e.target)) {
+        messageSearchBox.classList.add('hidden');
+      }
+    });
+
+    // ESC键关闭搜索框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !messageSearchBox.classList.contains('hidden')) {
+        messageSearchBox.classList.add('hidden');
+      }
+    });
+  }
+
   if (messageSearchInput) {
     messageSearchInput.addEventListener('input', (e) => {
       currentSearchQuery = e.target.value;
@@ -598,6 +614,9 @@ function renderSessionsList() {
     return;
   }
 
+  // 更新模型列表
+  updateModelsList();
+
   // 根据搜索查询过滤会话
   let filteredSessions = currentProject.sessions.filter(session => {
     if (!searchQuery) return true;
@@ -608,6 +627,9 @@ function renderSessionsList() {
 
     return matchId || matchPreview;
   });
+
+  // 应用高级筛选
+  filteredSessions = filteredSessions.filter(session => sessionMatchesFilters(session));
 
   // 将收藏的会话排在前面
   const favorites = getFavorites();
@@ -636,14 +658,43 @@ function renderSessionsList() {
     <div class="sessions-grid">
       ${filteredSessions.map(session => {
         const isFav = isFavorite(currentProject.id, session.id);
+        const sessionKey = `${currentProject.id}/${session.id}`;
+        const isSelected = selectedSessions.has(sessionKey);
+        const sessionTags = session.tags || [];
+        const statusIcon = session.status === 'error' ? '❌' : session.status === 'success' ? '✓' : '?';
+        const statusClass = session.status === 'error' ? 'status-error' : session.status === 'success' ? 'status-success' : 'status-unknown';
+        
         return `
-        <div class="session-card ${isFav ? 'favorite' : ''}" data-session-id="${session.id}">
+        <div class="session-card ${isBatchMode ? 'batch-mode' : ''} ${isFav ? 'favorite' : ''} ${isSelected ? 'selected' : ''}" data-session-id="${session.id}">
+          ${isBatchMode ? `
+            <div class="session-checkbox">
+              <input type="checkbox" ${isSelected ? 'checked' : ''} data-session-id="${session.id}" />
+            </div>
+          ` : ''}
           <div class="session-card-header">
             <div class="session-id">${session.id}</div>
             <div class="session-time">${formatTime(session.mtime)}</div>
           </div>
           <div class="session-preview">${escapeHtml(session.preview)}</div>
+          <div class="session-meta-row">
+            ${session.model ? `<span class="session-model" title="模型">🤖 ${session.model}</span>` : ''}
+            <span class="session-status ${statusClass}" title="状态">${statusIcon}</span>
+            ${session.tokenUsage?.total ? `<span class="session-tokens" title="Token 消耗">📊 ${session.tokenUsage.total}</span>` : ''}
+          </div>
+          ${sessionTags.length > 0 ? `
+            <div class="session-tags">
+              ${sessionTags.map(tag => {
+                const tagData = allTags[tag] || { color: '#6366f1' };
+                return `<span class="tag-badge small" style="background: ${tagData.color}20; border-color: ${tagData.color};">${tag}</span>`;
+              }).join('')}
+            </div>
+          ` : ''}
           <div class="session-card-actions">
+            <button class="btn btn-icon btn-small tag-btn" 
+                    data-session-id="${session.id}"
+                    title="管理标签">
+              🏷️
+            </button>
             <button class="btn btn-icon btn-small favorite-btn ${isFav ? 'active' : ''}" 
                     data-session-id="${session.id}" 
                     data-preview="${escapeHtml(session.preview.substring(0, 50))}"
@@ -660,6 +711,27 @@ function renderSessionsList() {
       `}).join('')}
     </div>
   `;
+
+  // 批量模式复选框事件
+  if (isBatchMode) {
+    sessionsContainer.querySelectorAll('.session-checkbox input').forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const sessionId = checkbox.dataset.sessionId;
+        toggleSessionSelection(sessionId);
+        checkbox.closest('.session-card').classList.toggle('selected', selectedSessions.has(`${currentProject.id}/${sessionId}`));
+      });
+    });
+  }
+
+  // 添加标签按钮事件
+  sessionsContainer.querySelectorAll('.tag-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sessionId = btn.dataset.sessionId;
+      showTagManagerModal(sessionId);
+    });
+  });
 
   // 添加收藏和删除按钮事件监听
   sessionsContainer.querySelectorAll('.favorite-btn').forEach(btn => {
@@ -1356,6 +1428,14 @@ function formatTime(date) {
   });
 }
 
+// 数字格式化（添加千位分隔符）
+function formatNumber(num) {
+  if (num === null || num === undefined) {
+    return '0';
+  }
+  return Number(num).toLocaleString('zh-CN');
+}
+
 // HTML 转义
 function escapeHtml(text) {
   if (text === null || text === undefined) {
@@ -1402,13 +1482,11 @@ function showSettingsModal() {
   const pageSizeSelect = document.getElementById('settingPageSize');
   const defaultFilterSelect = document.getElementById('settingDefaultFilter');
   const autoRefreshCheck = document.getElementById('settingAutoRefresh');
-  const showToolStatsCheck = document.getElementById('settingShowToolStats');
 
   if (themeSelect) themeSelect.value = settings.theme;
   if (pageSizeSelect) pageSizeSelect.value = settings.pageSize;
   if (defaultFilterSelect) defaultFilterSelect.value = settings.defaultMessageFilter;
   if (autoRefreshCheck) autoRefreshCheck.checked = settings.autoRefresh;
-  if (showToolStatsCheck) showToolStatsCheck.checked = settings.showToolStats;
 
   // 显示模态框
   settingsModalEl.classList.add('active');
@@ -1428,14 +1506,12 @@ function saveSettings() {
   const pageSizeSelect = document.getElementById('settingPageSize');
   const defaultFilterSelect = document.getElementById('settingDefaultFilter');
   const autoRefreshCheck = document.getElementById('settingAutoRefresh');
-  const showToolStatsCheck = document.getElementById('settingShowToolStats');
 
   const settings = {
     theme: themeSelect?.value || 'dark',
     pageSize: parseInt(pageSizeSelect?.value || '20'),
     defaultMessageFilter: defaultFilterSelect?.value || 'all',
-    autoRefresh: autoRefreshCheck?.checked !== false,
-    showToolStats: showToolStatsCheck?.checked !== false
+    autoRefresh: autoRefreshCheck?.checked !== false
   };
 
   saveUserSettings(settings);
@@ -1493,145 +1569,6 @@ function initSettingsPanel() {
 
 // 启动应用
 init();
-
-// 统计功能
-async function showStatsModal() {
-  try {
-    // 检查模态框元素是否存在
-    const statsModalEl = document.getElementById('statsModal');
-    if (!statsModalEl) {
-      console.error('statsModal element not found');
-      return;
-    }
-
-    // 显示加载状态
-    const totalProjectsEl = document.getElementById('totalProjects');
-    const totalSessionsEl = document.getElementById('totalSessions');
-    const totalMessagesEl = document.getElementById('totalMessages');
-    const totalToolCallsEl = document.getElementById('totalToolCalls');
-    const totalTokensEl = document.getElementById('totalTokens');
-    const totalInputTokensEl = document.getElementById('totalInputTokens');
-    const totalOutputTokensEl = document.getElementById('totalOutputTokens');
-    const estimatedCostEl = document.getElementById('estimatedCost');
-
-    // 设置加载状态
-    if (totalProjectsEl) totalProjectsEl.textContent = '...';
-    if (totalSessionsEl) totalSessionsEl.textContent = '...';
-    if (totalMessagesEl) totalMessagesEl.textContent = '...';
-    if (totalToolCallsEl) totalToolCallsEl.textContent = '...';
-    if (totalTokensEl) totalTokensEl.textContent = '...';
-    if (totalInputTokensEl) totalInputTokensEl.textContent = '...';
-    if (totalOutputTokensEl) totalOutputTokensEl.textContent = '...';
-    if (estimatedCostEl) estimatedCostEl.textContent = '...';
-
-    // 显示模态框
-    statsModalEl.classList.add('active');
-
-    // 调用后端统计 API
-    const response = await fetch('/api/stats');
-    const stats = await response.json();
-
-    // 更新统计数据
-    if (totalProjectsEl) totalProjectsEl.textContent = stats.totalProjects;
-    if (totalSessionsEl) totalSessionsEl.textContent = stats.totalSessions;
-    if (totalMessagesEl) totalMessagesEl.textContent = stats.totalMessages;
-    if (totalToolCallsEl) totalToolCallsEl.textContent = stats.totalToolCalls;
-    if (totalTokensEl) totalTokensEl.textContent = stats.totalTokens?.toLocaleString() || '0';
-    if (totalInputTokensEl) totalInputTokensEl.textContent = stats.totalInputTokens?.toLocaleString() || '0';
-    if (totalOutputTokensEl) totalOutputTokensEl.textContent = stats.totalOutputTokens?.toLocaleString() || '0';
-    if (estimatedCostEl) estimatedCostEl.textContent = `$${(stats.estimatedCost || 0).toFixed(4)}`;
-
-    // 更新工具使用统计图表
-    updateToolStatsChart(stats.toolUsageStats || {});
-  } catch (error) {
-    console.error('Error loading stats:', error);
-    showToast('加载统计数据失败', 'error');
-  }
-}
-
-// 更新工具使用统计图表
-function updateToolStatsChart(toolStats) {
-  const chartContainer = document.getElementById('toolStatsChart');
-  if (!chartContainer) return;
-
-  const entries = Object.entries(toolStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  
-  if (entries.length === 0) {
-    chartContainer.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">暂无工具使用数据</div>';
-    return;
-  }
-
-  const maxCount = Math.max(...entries.map(e => e[1]));
-  
-  chartContainer.innerHTML = entries.map(([tool, count]) => {
-    const config = TOOL_CONFIG[tool] || { icon: '🔧', name: tool, color: '#6b7280' };
-    const percentage = (count / maxCount * 100).toFixed(0);
-    
-    return `
-      <div class="tool-stat-item">
-        <div class="tool-stat-header">
-          <span class="tool-stat-icon">${config.icon}</span>
-          <span class="tool-stat-name">${config.name}</span>
-          <span class="tool-stat-count">${count} 次</span>
-        </div>
-        <div class="tool-stat-bar">
-          <div class="tool-stat-bar-fill" style="width: ${percentage}%; background: ${config.color};"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-// 导出为 Markdown
-function exportAsMarkdown() {
-  if (!currentSession || !currentSession.messages) return;
-
-  let markdown = `# 会话记录\n\n`;
-  markdown += `**会话 ID**: ${currentSession.id}\n\n`;
-  markdown += `**时间**: ${formatTime(new Date())}\n\n`;
-  markdown += `---\n\n`;
-
-  currentSession.messages.forEach(msg => {
-    const type = msg.type === 'user' ? '用户' : '助手';
-    const time = formatTime(new Date(msg.timestamp));
-    const content = extractMessageContent(msg);
-
-    markdown += `## ${type} (${time})\n\n`;
-    markdown += `${content}\n\n`;
-
-    // 添加工具调用信息
-    if (msg.message?.content && Array.isArray(msg.message.content)) {
-      const toolCalls = msg.message.content.filter(c => c.type === 'tool_use');
-      if (toolCalls.length > 0) {
-        markdown += `### 工具调用\n\n`;
-        toolCalls.forEach(tc => {
-          markdown += `**工具**: ${tc.name}\n\n`;
-          markdown += `\`\`\`json\n${JSON.stringify(tc.input, null, 2)}\n\`\`\`\n\n`;
-        });
-      }
-
-      const toolResults = msg.message.content.filter(c => c.type === 'tool_result');
-      if (toolResults.length > 0) {
-        markdown += `### 工具结果\n\n`;
-        toolResults.forEach(tr => {
-          markdown += `\`\`\`json\n${JSON.stringify(tr.content, null, 2)}\n\`\`\`\n\n`;
-        });
-      }
-    }
-
-    markdown += `---\n\n`;
-  });
-
-  downloadFile(markdown, `session-${currentSession.id}.md`, 'text/markdown');
-}
-
-// 导出为 JSON
-function exportAsJson() {
-  if (!currentSession || !currentSession.messages) return;
-
-  const json = JSON.stringify(currentSession.messages, null, 2);
-  downloadFile(json, `session-${currentSession.id}.json`, 'application/json');
-}
 
 // 下载文件
 function downloadFile(content, filename, mimeType) {
@@ -2056,3 +1993,1048 @@ async function openIflowForProject(projectId) {
     showToast('打开 iflow 失败', 'error');
   }
 }
+
+// ==================== v1.2.0 批量操作功能 ====================
+
+// 切换批量操作模式
+function toggleBatchMode() {
+  // 检查是否在会话详情页面，如果是则不允许进入批量模式
+  const sessionDetail = document.getElementById('sessionDetail');
+  if (sessionDetail && !sessionDetail.classList.contains('hidden')) {
+    showToast('请先返回会话列表再使用批量操作模式', 'error');
+    return;
+  }
+  
+  isBatchMode = !isBatchMode;
+  selectedSessions.clear();
+  
+  const batchModeBtn = document.getElementById('batchModeBtn');
+  const batchActionsPanel = document.getElementById('batchActionsPanel');
+  const advancedFilterPanel = document.getElementById('advancedFilterPanel');
+  
+  if (isBatchMode) {
+    if (batchModeBtn) batchModeBtn.classList.add('active');
+    if (batchActionsPanel) batchActionsPanel.classList.remove('hidden');
+    if (advancedFilterPanel) advancedFilterPanel.classList.remove('hidden');
+    showToast('已进入批量操作模式');
+  } else {
+    if (batchModeBtn) batchModeBtn.classList.remove('active');
+    if (batchActionsPanel) batchActionsPanel.classList.add('hidden');
+    if (advancedFilterPanel) advancedFilterPanel.classList.add('hidden');
+    showToast('已退出批量操作模式');
+  }
+  
+  renderSessionsList();
+}
+
+// 切换会话选择
+function toggleSessionSelection(sessionId) {
+  const key = `${currentProject.id}/${sessionId}`;
+  if (selectedSessions.has(key)) {
+    selectedSessions.delete(key);
+  } else {
+    selectedSessions.add(key);
+  }
+  updateBatchSelectionCount();
+}
+
+// 全选/取消全选
+function toggleSelectAll() {
+  if (!currentProject) return;
+  
+  const allSessionKeys = currentProject.sessions.map(s => `${currentProject.id}/${s.id}`);
+  const allSelected = allSessionKeys.every(key => selectedSessions.has(key));
+  
+  if (allSelected) {
+    allSessionKeys.forEach(key => selectedSessions.delete(key));
+  } else {
+    allSessionKeys.forEach(key => selectedSessions.add(key));
+  }
+  
+  renderSessionsList();
+  updateBatchSelectionCount();
+}
+
+// 更新批量选择计数
+function updateBatchSelectionCount() {
+  const countEl = document.getElementById('selectedCount');
+  if (countEl) {
+    countEl.textContent = selectedSessions.size;
+  }
+}
+
+// 批量删除会话
+async function batchDeleteSessions() {
+  if (selectedSessions.size === 0) {
+    showToast('请先选择要删除的会话', 'error');
+    return;
+  }
+  
+  const sessions = Array.from(selectedSessions).map(key => {
+    const [projectId, sessionId] = key.split('/');
+    return { projectId, sessionId };
+  });
+  
+  if (!confirm(`确定要删除 ${sessions.length} 个会话吗？此操作不可恢复。`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/sessions/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessions })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      showToast(`已删除 ${result.deletedCount} 个会话`);
+      selectedSessions.clear();
+      
+      // 刷新项目列表
+      await loadProjects();
+      if (currentProject) {
+        selectProject(currentProject.id);
+      }
+    } else {
+      showToast(result.error || '批量删除失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to batch delete sessions:', error);
+    showToast('批量删除失败', 'error');
+  }
+}
+
+// ==================== v1.2.0 高级筛选功能 ====================
+
+// 加载标签数据
+async function loadTagsData() {
+  try {
+    const response = await fetch('/api/tags');
+    const data = await response.json();
+    allTags = data.tags || {};
+    
+    // 更新标签筛选下拉框
+    updateTagFilterOptions();
+  } catch (error) {
+    console.error('Failed to load tags:', error);
+  }
+}
+
+// 更新标签筛选选项
+function updateTagFilterOptions() {
+  const tagFilter = document.getElementById('tagFilter');
+  if (!tagFilter) return;
+  
+  const currentValue = tagFilter.value;
+  tagFilter.innerHTML = '<option value="">全部标签</option>';
+  
+  Object.keys(allTags).forEach(tagName => {
+    const option = document.createElement('option');
+    option.value = tagName;
+    option.textContent = `${tagName} (${allTags[tagName].count || 0})`;
+    tagFilter.appendChild(option);
+  });
+  
+  tagFilter.value = currentValue;
+}
+
+// 应用高级筛选
+function applyAdvancedFilters() {
+  const modelFilter = document.getElementById('modelFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const tagFilter = document.getElementById('tagFilter');
+  
+  advancedFilters.model = modelFilter?.value || '';
+  advancedFilters.status = statusFilter?.value || '';
+  advancedFilters.tag = tagFilter?.value || '';
+  
+  renderSessionsList();
+}
+
+// 重置高级筛选
+function resetAdvancedFilters() {
+  advancedFilters = { model: '', status: '', tag: '' };
+  
+  const modelFilter = document.getElementById('modelFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const tagFilter = document.getElementById('tagFilter');
+  
+  if (modelFilter) modelFilter.value = '';
+  if (statusFilter) statusFilter.value = '';
+  if (tagFilter) tagFilter.value = '';
+  
+  renderSessionsList();
+}
+
+// 检查会话是否符合高级筛选条件
+function sessionMatchesFilters(session) {
+  // 模型筛选
+  if (advancedFilters.model && session.model !== advancedFilters.model) {
+    return false;
+  }
+  
+  // 状态筛选
+  if (advancedFilters.status && session.status !== advancedFilters.status) {
+    return false;
+  }
+  
+  // 标签筛选
+  if (advancedFilters.tag) {
+    const sessionTags = session.tags || [];
+    if (!sessionTags.includes(advancedFilters.tag)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+// 更新模型列表
+function updateModelsList() {
+  if (!currentProject) return;
+  
+  allModels.clear();
+  currentProject.sessions.forEach(session => {
+    if (session.model) {
+      allModels.add(session.model);
+    }
+  });
+  
+  // 更新模型筛选下拉框
+  const modelFilter = document.getElementById('modelFilter');
+  if (!modelFilter) return;
+  
+  const currentValue = modelFilter.value;
+  modelFilter.innerHTML = '<option value="">全部模型</option>';
+  
+  Array.from(allModels).sort().forEach(model => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    modelFilter.appendChild(option);
+  });
+  
+  modelFilter.value = currentValue;
+}
+
+// ==================== v1.2.0 标签管理功能 ====================
+
+// 显示标签管理模态框
+async function showTagManagerModal(sessionId) {
+  const key = `${currentProject.id}/${sessionId}`;
+  const session = currentProject.sessions.find(s => s.id === sessionId);
+  
+  // 创建模态框
+  const modal = document.createElement('div');
+  modal.className = 'modal tag-manager-modal';
+  modal.innerHTML = `
+    <div class="modal-content tag-manager-content">
+      <div class="modal-header">
+        <h2>🏷️ 管理标签</h2>
+        <button class="btn btn-icon close-tag-manager">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="tag-session-info">
+          <span class="tag-session-id">${sessionId}</span>
+          <span class="tag-session-preview">${session?.preview?.substring(0, 50) || ''}...</span>
+        </div>
+        <div class="tag-input-section">
+          <input type="text" id="newTagInput" placeholder="输入新标签..." class="tag-input" />
+          <button class="btn btn-primary" id="addTagBtn">添加</button>
+        </div>
+        <div class="current-tags-section">
+          <h4>当前标签</h4>
+          <div id="currentTagsList" class="current-tags-list">
+            <span class="loading-tags">加载中...</span>
+          </div>
+        </div>
+        <div class="all-tags-section">
+          <h4>所有标签</h4>
+          <div id="allTagsList" class="all-tags-list">
+            ${Object.keys(allTags).length === 0 ? '<span class="no-tags">暂无标签</span>' : 
+              Object.entries(allTags).map(([name, data]) => `
+                <span class="tag-badge clickable" data-tag="${name}" style="background: ${data.color}20; border-color: ${data.color};">
+                  ${name}
+                </span>
+              `).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-tag-manager-btn">关闭</button>
+        <button class="btn btn-primary save-tags-btn">保存</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // 加载当前会话标签
+  await loadSessionTags(sessionId);
+  
+  // 添加事件监听
+  const closeModal = () => {
+    modal.classList.remove('active');
+    setTimeout(() => modal.remove(), 200);
+  };
+  
+  modal.querySelector('.close-tag-manager').addEventListener('click', closeModal);
+  modal.querySelector('.close-tag-manager-btn').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  
+  // 添加新标签
+  const addTagBtn = modal.querySelector('#addTagBtn');
+  const newTagInput = modal.querySelector('#newTagInput');
+  
+  addTagBtn.addEventListener('click', () => {
+    const tagName = newTagInput.value.trim().toLowerCase();
+    if (tagName) {
+      addTagToCurrentSession(tagName);
+      newTagInput.value = '';
+    }
+  });
+  
+  newTagInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const tagName = newTagInput.value.trim().toLowerCase();
+      if (tagName) {
+        addTagToCurrentSession(tagName);
+        newTagInput.value = '';
+      }
+    }
+  });
+  
+  // 点击已有标签添加
+  modal.querySelector('#allTagsList').addEventListener('click', (e) => {
+    const tagBadge = e.target.closest('.tag-badge.clickable');
+    if (tagBadge) {
+      const tagName = tagBadge.dataset.tag;
+      addTagToCurrentSession(tagName);
+    }
+  });
+  
+  // 保存标签
+  modal.querySelector('.save-tags-btn').addEventListener('click', async () => {
+    await saveSessionTags(sessionId);
+    closeModal();
+  });
+  
+  // 显示模态框
+  requestAnimationFrame(() => {
+    modal.classList.add('active');
+  });
+}
+
+// 当前编辑的会话标签（临时存储）
+let currentEditingTags = [];
+
+// 加载会话标签
+async function loadSessionTags(sessionId) {
+  try {
+    const response = await fetch(`/api/sessions/${currentProject.id}/${sessionId}/tags`);
+    const data = await response.json();
+    currentEditingTags = data.tags || [];
+    renderCurrentTags();
+  } catch (error) {
+    console.error('Failed to load session tags:', error);
+    currentEditingTags = [];
+    renderCurrentTags();
+  }
+}
+
+// 渲染当前标签
+function renderCurrentTags() {
+  const container = document.getElementById('currentTagsList');
+  if (!container) return;
+  
+  if (currentEditingTags.length === 0) {
+    container.innerHTML = '<span class="no-current-tags">暂无标签</span>';
+    return;
+  }
+  
+  container.innerHTML = currentEditingTags.map(tag => {
+    const tagData = allTags[tag] || { color: '#6366f1' };
+    return `
+      <span class="tag-badge removable" data-tag="${tag}" style="background: ${tagData.color}20; border-color: ${tagData.color};">
+        ${tag}
+        <button class="remove-tag-btn" data-tag="${tag}">×</button>
+      </span>
+    `;
+  }).join('');
+  
+  // 添加移除事件
+  container.querySelectorAll('.remove-tag-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tagName = btn.dataset.tag;
+      removeTagFromCurrentSession(tagName);
+    });
+  });
+}
+
+// 添加标签到当前编辑
+function addTagToCurrentSession(tagName) {
+  if (!currentEditingTags.includes(tagName)) {
+    currentEditingTags.push(tagName);
+    renderCurrentTags();
+  }
+}
+
+// 从当前编辑移除标签
+function removeTagFromCurrentSession(tagName) {
+  currentEditingTags = currentEditingTags.filter(t => t !== tagName);
+  renderCurrentTags();
+}
+
+// 保存会话标签
+async function saveSessionTags(sessionId) {
+  try {
+    const response = await fetch(`/api/sessions/${currentProject.id}/${sessionId}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: currentEditingTags })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      showToast('标签已保存');
+      
+      // 更新本地数据
+      const session = currentProject.sessions.find(s => s.id === sessionId);
+      if (session) {
+        session.tags = currentEditingTags;
+      }
+      
+      // 重新加载标签数据
+      await loadTagsData();
+      renderSessionsList();
+    } else {
+      showToast(result.error || '保存标签失败', 'error');
+    }
+  } catch (error) {
+    console.error('Failed to save session tags:', error);
+    showToast('保存标签失败', 'error');
+  }
+}
+
+// 初始化 v1.2.0 功能
+async function initV120Features() {
+  // 加载标签数据
+  await loadTagsData();
+
+  // 绑定批量操作按钮事件
+  const batchModeBtn = document.getElementById('batchModeBtn');
+  const selectAllBtn = document.getElementById('selectAllBtn');
+  const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+
+  if (batchModeBtn) {
+    batchModeBtn.addEventListener('click', toggleBatchMode);
+  }
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', toggleSelectAll);
+  }
+
+  if (batchDeleteBtn) {
+    batchDeleteBtn.addEventListener('click', batchDeleteSessions);
+  }
+
+  // 绑定高级筛选事件
+  const modelFilter = document.getElementById('modelFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const tagFilter = document.getElementById('tagFilter');
+  const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+  
+  if (modelFilter) {
+    modelFilter.addEventListener('change', applyAdvancedFilters);
+  }
+  
+  if (statusFilter) {
+    statusFilter.addEventListener('change', applyAdvancedFilters);
+  }
+  
+  if (tagFilter) {
+    tagFilter.addEventListener('change', applyAdvancedFilters);
+  }
+  
+  if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener('click', resetAdvancedFilters);
+  }
+  
+  // 初始化 v1.3.0 P1 功能
+  initAIFeatures();
+}
+
+// ==================== v1.3.0 P1 AI 助手功能 ====================
+
+let aiChatHistory = [];
+let isAiPanelOpen = false;
+
+// 切换 AI 助手面板
+function toggleAiAssistant() {
+  const panel = document.getElementById('aiAssistantPanel');
+  const btn = document.getElementById('aiAssistantBtn');
+  
+  isAiPanelOpen = !isAiPanelOpen;
+  
+  if (isAiPanelOpen) {
+    panel.classList.remove('hidden');
+    btn.classList.add('active');
+    // 检查 AI 配置
+    checkAIConfig();
+  } else {
+    panel.classList.add('hidden');
+    btn.classList.remove('active');
+  }
+}
+
+// 检查 AI 配置状态
+async function checkAIConfig() {
+  try {
+    const response = await fetch('/api/ai/config');
+    const config = await response.json();
+    
+    const welcomeMsg = document.querySelector('.ai-welcome-message p:last-child');
+    if (welcomeMsg) {
+      if (config.enabled && config.hasApiKey) {
+        welcomeMsg.textContent = 'AI 助手已就绪，有什么可以帮助你的？';
+        welcomeMsg.style.color = 'var(--accent-primary)';
+      } else {
+        welcomeMsg.textContent = '请先在设置中配置 API Key 以启用 AI 功能';
+        welcomeMsg.style.color = 'var(--text-muted)';
+      }
+    }
+  } catch (error) {
+    console.error('Failed to check AI config:', error);
+  }
+}
+
+// 发送 AI 消息
+async function sendAiMessage(message) {
+  const chatMessages = document.getElementById('aiChatMessages');
+  const input = document.getElementById('aiChatInput');
+  
+  // 添加用户消息
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'ai-message user';
+  userMsgEl.textContent = message;
+  chatMessages.appendChild(userMsgEl);
+  
+  // 添加加载指示
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'ai-message assistant loading';
+  loadingEl.textContent = '思考中';
+  chatMessages.appendChild(loadingEl);
+  
+  // 滚动到底部
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  // 清空输入框
+  input.value = '';
+  input.style.height = 'auto';
+  
+  // 添加到历史
+  aiChatHistory.push({ role: 'user', content: message });
+  
+  try {
+    const response = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: aiChatHistory,
+        context: currentSession ? {
+          projectId: currentProject?.id,
+          sessionId: currentSession?.id,
+          sessionSummary: currentProject?.sessions?.find(s => s.id === currentSession?.id)?.preview
+        } : null
+      })
+    });
+    
+    const result = await response.json();
+    
+    // 移除加载指示
+    loadingEl.remove();
+    
+    if (result.success) {
+      // 添加助手回复
+      const assistantMsgEl = document.createElement('div');
+      assistantMsgEl.className = 'ai-message assistant';
+      assistantMsgEl.innerHTML = formatAIMessage(result.message);
+      chatMessages.appendChild(assistantMsgEl);
+      
+      // 添加到历史
+      aiChatHistory.push({ role: 'assistant', content: result.message });
+    } else {
+      // 显示错误
+      const errorEl = document.createElement('div');
+      errorEl.className = 'ai-message assistant';
+      errorEl.innerHTML = `<span style="color: #ef4444;">错误: ${result.error || result.message}</span>`;
+      chatMessages.appendChild(errorEl);
+    }
+  } catch (error) {
+    loadingEl.remove();
+    const errorEl = document.createElement('div');
+    errorEl.className = 'ai-message assistant';
+    errorEl.innerHTML = `<span style="color: #ef4444;">请求失败: ${error.message}</span>`;
+    chatMessages.appendChild(errorEl);
+  }
+  
+  // 滚动到底部
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// 格式化 AI 消息（支持 Markdown）
+function formatAIMessage(content) {
+  if (!content) return '';
+  
+  // 简单的 Markdown 转换
+  let formatted = content
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  
+  return formatted;
+}
+
+// 清除 AI 上下文（保留欢迎消息，清空历史记录）
+function clearAiContext() {
+  aiChatHistory = [];
+  const chatMessages = document.getElementById('aiChatMessages');
+  if (chatMessages) {
+    // 保留欢迎消息，移除其他消息
+    const welcomeMsg = chatMessages.querySelector('.ai-welcome-message');
+    chatMessages.innerHTML = '';
+    if (welcomeMsg) {
+      chatMessages.appendChild(welcomeMsg);
+    }
+  }
+  showToast('已清除 AI 上下文');
+}
+
+// 新建 AI 会话（完全重置，包括欢迎消息）
+function clearAiChat() {
+  aiChatHistory = [];
+  const chatMessages = document.getElementById('aiChatMessages');
+  if (chatMessages) {
+    // 重置为初始欢迎消息
+    chatMessages.innerHTML = `
+      <div class="ai-welcome-message">
+        <div class="ai-welcome-icon">👋</div>
+        <div class="ai-welcome-text">
+          <p>你好！我是 AI 助手，可以帮助你：</p>
+          <ul>
+            <li>分析当前会话内容</li>
+            <li>解释代码和工具调用</li>
+            <li>回答技术问题</li>
+            <li>提供建议和优化方案</li>
+          </ul>
+          <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">请先在设置中配置 API Key 以启用 AI 功能</p>
+        </div>
+      </div>
+    `;
+  }
+  // 清空输入框
+  const input = document.getElementById('aiChatInput');
+  if (input) {
+    input.value = '';
+    input.style.height = 'auto';
+  }
+  showToast('已创建新的 AI 会话');
+}
+
+// 快速操作处理
+function handleAiQuickAction(action) {
+  if (!currentSession) {
+    showToast('请先选择一个会话', 'error');
+    return;
+  }
+  
+  switch (action) {
+    case 'analyze':
+      analyzeCurrentSession();
+      break;
+    case 'explain':
+      sendAiMessage('请解释当前会话中的关键工具调用和它们的作用');
+      break;
+  }
+}
+
+// 分析当前会话
+async function analyzeCurrentSession() {
+  if (!currentProject || !currentSession) {
+    showToast('请先选择一个会话', 'error');
+    return;
+  }
+  
+  // 显示分析模态框
+  const modal = document.getElementById('analysisModal');
+  const loading = document.getElementById('analysisLoading');
+  const result = document.getElementById('analysisResult');
+  const error = document.getElementById('analysisError');
+  const footer = document.getElementById('analysisFooter');
+  
+  modal.classList.add('active');
+  loading.style.display = 'block';
+  result.style.display = 'none';
+  error.style.display = 'none';
+  footer.style.display = 'none';
+  
+  try {
+    const response = await fetch('/api/ai/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: currentProject.id,
+        sessionId: currentSession.id
+      })
+    });
+    
+    const data = await response.json();
+    
+    loading.style.display = 'none';
+    
+    if (data.success) {
+      renderAnalysisResult(data.analysis);
+      result.style.display = 'block';
+      footer.style.display = 'flex';
+    } else {
+      document.getElementById('analysisErrorMsg').textContent = data.error || data.message;
+      error.style.display = 'block';
+    }
+  } catch (err) {
+    loading.style.display = 'none';
+    document.getElementById('analysisErrorMsg').textContent = err.message;
+    error.style.display = 'block';
+  }
+}
+
+// 渲染分析结果
+function renderAnalysisResult(analysis) {
+  // 摘要
+  document.getElementById('analysisSummary').innerHTML = formatAIMessage(analysis.summary || '暂无摘要');
+  
+  // 关键决策
+  const decisionsEl = document.getElementById('analysisDecisions');
+  if (analysis.decisions && analysis.decisions.length > 0) {
+    decisionsEl.innerHTML = '<ul>' + analysis.decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('') + '</ul>';
+  } else {
+    decisionsEl.innerHTML = '<p style="color: var(--text-muted);">暂无关键决策</p>';
+  }
+  
+  // 问题解决
+  const problemsEl = document.getElementById('analysisProblems');
+  if (analysis.problems && analysis.problems.length > 0) {
+    problemsEl.innerHTML = '<ul>' + analysis.problems.map(p => `<li>${escapeHtml(p)}</li>`).join('') + '</ul>';
+  } else {
+    problemsEl.innerHTML = '<p style="color: var(--text-muted);">暂无问题解决记录</p>';
+  }
+  
+  // 效率统计
+  const statsEl = document.getElementById('analysisStats');
+  const stats = analysis.stats || {};
+  const metadata = analysis.metadata || {};
+  
+  statsEl.innerHTML = `
+    <div class="analysis-stat-item">
+      <div class="analysis-stat-value">${metadata.messageCount || 0}</div>
+      <div class="analysis-stat-label">消息数量</div>
+    </div>
+    <div class="analysis-stat-item">
+      <div class="analysis-stat-value">${formatNumber(metadata.totalTokens || 0)}</div>
+      <div class="analysis-stat-label">Token 消耗</div>
+    </div>
+    <div class="analysis-stat-item">
+      <div class="analysis-stat-value">${metadata.toolCallCount || 0}</div>
+      <div class="analysis-stat-label">工具调用</div>
+    </div>
+    <div class="analysis-stat-item">
+      <div class="analysis-stat-value">${stats.efficiency || '--'}</div>
+      <div class="analysis-stat-label">效率评估</div>
+    </div>
+  `;
+  
+  // 建议
+  const suggestionsEl = document.getElementById('analysisSuggestions');
+  if (analysis.suggestions && analysis.suggestions.length > 0) {
+    suggestionsEl.innerHTML = '<ul>' + analysis.suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('') + '</ul>';
+  } else {
+    suggestionsEl.innerHTML = '<p style="color: var(--text-muted);">暂无改进建议</p>';
+  }
+}
+
+// 导出分析报告
+function exportAnalysisReport() {
+  const summary = document.getElementById('analysisSummary').innerText;
+  const decisions = document.getElementById('analysisDecisions').innerText;
+  const problems = document.getElementById('analysisProblems').innerText;
+  const stats = document.getElementById('analysisStats').innerText;
+  const suggestions = document.getElementById('analysisSuggestions').innerText;
+  
+  const report = `# 会话分析报告
+
+## 会话摘要
+${summary}
+
+## 关键决策
+${decisions}
+
+## 问题解决过程
+${problems}
+
+## 效率统计
+${stats}
+
+## 改进建议
+${suggestions}
+
+---
+*报告生成时间: ${new Date().toLocaleString('zh-CN')}*
+`;
+  
+  downloadFile(report, `analysis-${currentSession?.id || 'report'}.md`, 'text/markdown');
+  showToast('分析报告已导出');
+}
+
+// 初始化 AI 功能
+function initAIFeatures() {
+  // AI 助手按钮
+  const aiAssistantBtn = document.getElementById('aiAssistantBtn');
+  if (aiAssistantBtn) {
+    aiAssistantBtn.addEventListener('click', toggleAiAssistant);
+  }
+  
+  // 关闭 AI 助手面板
+  const closeAiAssistantBtn = document.getElementById('closeAiAssistantBtn');
+  if (closeAiAssistantBtn) {
+    closeAiAssistantBtn.addEventListener('click', () => {
+      document.getElementById('aiAssistantPanel').classList.add('hidden');
+      document.getElementById('aiAssistantBtn').classList.remove('active');
+      isAiPanelOpen = false;
+    });
+  }
+  
+  // 新建会话按钮
+  const aiNewChatBtn = document.getElementById('aiNewChatBtn');
+  if (aiNewChatBtn) {
+    aiNewChatBtn.addEventListener('click', clearAiChat);
+  }
+  
+  // 清除上下文按钮
+  const aiClearContextBtn = document.getElementById('aiClearContextBtn');
+  if (aiClearContextBtn) {
+    aiClearContextBtn.addEventListener('click', clearAiContext);
+  }
+  
+  // AI 聊天输入
+  const aiChatInput = document.getElementById('aiChatInput');
+  const aiSendBtn = document.getElementById('aiSendBtn');
+  
+  if (aiChatInput && aiSendBtn) {
+    // 自动调整高度
+    aiChatInput.addEventListener('input', () => {
+      aiChatInput.style.height = 'auto';
+      aiChatInput.style.height = Math.min(aiChatInput.scrollHeight, 120) + 'px';
+    });
+    
+    // 发送按钮
+    aiSendBtn.addEventListener('click', () => {
+      const message = aiChatInput.value.trim();
+      if (message) {
+        sendAiMessage(message);
+      }
+    });
+    
+    // Enter 发送，Shift+Enter 换行
+    aiChatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const message = aiChatInput.value.trim();
+        if (message) {
+          sendAiMessage(message);
+        }
+      }
+    });
+  }
+  
+  // 快速操作按钮
+  document.querySelectorAll('.ai-quick-action-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      handleAiQuickAction(action);
+    });
+  });
+  
+  // 分析会话按钮
+  const analyzeSessionBtn = document.getElementById('analyzeSessionBtn');
+  if (analyzeSessionBtn) {
+    analyzeSessionBtn.addEventListener('click', analyzeCurrentSession);
+  }
+  
+  // 关闭分析模态框
+  const closeAnalysisBtn = document.getElementById('closeAnalysisBtn');
+  if (closeAnalysisBtn) {
+    closeAnalysisBtn.addEventListener('click', () => {
+      document.getElementById('analysisModal').classList.remove('active');
+    });
+  }
+  
+  // 重新分析按钮
+  const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+  if (reanalyzeBtn) {
+    reanalyzeBtn.addEventListener('click', analyzeCurrentSession);
+  }
+  
+  // 导出分析报告按钮
+  const exportAnalysisBtn = document.getElementById('exportAnalysisBtn');
+  if (exportAnalysisBtn) {
+    exportAnalysisBtn.addEventListener('click', exportAnalysisReport);
+  }
+  
+  // 点击模态框外部关闭
+  const analysisModal = document.getElementById('analysisModal');
+  if (analysisModal) {
+    analysisModal.addEventListener('click', (e) => {
+      if (e.target === analysisModal) {
+        analysisModal.classList.remove('active');
+      }
+    });
+  }
+  
+  // AI 设置相关
+  const testApiConnectionBtn = document.getElementById('testApiConnectionBtn');
+  if (testApiConnectionBtn) {
+    testApiConnectionBtn.addEventListener('click', testAPIConnection);
+  }
+  
+  console.log('iflow-run v1.3.0 P1 AI features initialized');
+}
+
+// 测试 API 连接
+async function testAPIConnection() {
+  const provider = document.getElementById('settingAiProvider').value;
+  const apiKey = document.getElementById('settingApiKey').value;
+  const model = document.getElementById('settingAiModel').value;
+  
+  if (!apiKey) {
+    showToast('请输入 API Key', 'error');
+    return;
+  }
+  
+  const statusEl = document.getElementById('apiConnectionStatus');
+  statusEl.style.display = 'block';
+  statusEl.className = '';
+  statusEl.textContent = '测试连接中...';
+  
+  try {
+    // 先保存配置
+    await fetch('/api/ai/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, apiKey, model, enabled: true })
+    });
+    
+    // 测试连接
+    const response = await fetch('/api/ai/test', { method: 'POST' });
+    const result = await response.json();
+    
+    if (result.success) {
+      statusEl.className = 'success';
+      statusEl.textContent = '✓ ' + result.message;
+    } else {
+      statusEl.className = 'error';
+      statusEl.textContent = '✗ ' + (result.error || result.message);
+    }
+  } catch (error) {
+    statusEl.className = 'error';
+    statusEl.textContent = '✗ 连接失败: ' + error.message;
+  }
+}
+
+// 修改保存设置函数以支持 AI 配置
+const originalSaveSettings = saveSettings;
+function saveSettingsWithAI() {
+  const themeSelect = document.getElementById('settingTheme');
+  const pageSizeSelect = document.getElementById('settingPageSize');
+  const defaultFilterSelect = document.getElementById('settingDefaultFilter');
+  const autoRefreshCheck = document.getElementById('settingAutoRefresh');
+  const showToolStatsCheck = document.getElementById('settingShowToolStats');
+  
+  // AI 设置
+  const aiProvider = document.getElementById('settingAiProvider');
+  const apiKey = document.getElementById('settingApiKey');
+  const aiModel = document.getElementById('settingAiModel');
+  const enableAiAssistant = document.getElementById('settingEnableAiAssistant');
+  
+  const settings = {
+    theme: themeSelect?.value || 'dark',
+    pageSize: parseInt(pageSizeSelect?.value || '20'),
+    defaultMessageFilter: defaultFilterSelect?.value || 'all',
+    autoRefresh: autoRefreshCheck?.checked !== false,
+    showToolStats: showToolStatsCheck?.checked !== false,
+    ai: {
+      provider: aiProvider?.value || 'iflow',
+      apiKey: apiKey?.value || '',
+      model: aiModel?.value || 'iflow-rome-30ba3b',
+      enabled: enableAiAssistant?.checked || false
+    }
+  };
+  
+  saveUserSettings(settings);
+  
+  // 保存到后端
+  if (settings.ai.apiKey) {
+    fetch('/api/ai/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings.ai)
+    });
+  }
+  
+  // 应用主题
+  if (settings.theme === 'light') {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+  
+  showToast('设置已保存');
+  closeSettingsModal();
+}
+
+// 加载 AI 设置到设置面板
+function loadAISettings() {
+  const settings = getUserSettings();
+  const aiSettings = settings.ai || {};
+  
+  const aiProvider = document.getElementById('settingAiProvider');
+  const apiKey = document.getElementById('settingApiKey');
+  const aiModel = document.getElementById('settingAiModel');
+  const enableAiAssistant = document.getElementById('settingEnableAiAssistant');
+  
+  if (aiProvider) aiProvider.value = aiSettings.provider || 'iflow';
+  if (apiKey) apiKey.value = aiSettings.apiKey || '';
+  if (aiModel) aiModel.value = aiSettings.model || 'iflow-rome-30ba3b';
+  if (enableAiAssistant) enableAiAssistant.checked = aiSettings.enabled || false;
+}
+
+// 覆盖原始的 showSettingsModal 函数
+const originalShowSettingsModal = showSettingsModal;
+window.showSettingsModal = function() {
+  originalShowSettingsModal();
+  loadAISettings();
+};
+
+// 覆盖原始的 saveSettings 函数
+window.saveSettings = saveSettingsWithAI;
