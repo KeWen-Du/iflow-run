@@ -89,6 +89,149 @@ interface SearchResult {
   uuid: string;
 }
 
+// ==================== 安全验证函数 ====================
+
+/**
+ * 验证路径组件，防止路径遍历攻击
+ * @param input 用户输入的路径组件
+ * @returns 安全的路径组件
+ * @throws Error 如果路径包含非法字符
+ */
+function sanitizePathComponent(input: string | string[] | undefined): string {
+  // 处理数组类型（取第一个元素）
+  const strValue = Array.isArray(input) ? input[0] : input;
+  
+  if (!strValue || typeof strValue !== 'string') {
+    throw new Error('Invalid path component: empty or not a string');
+  }
+  
+  // 移除首尾空白
+  const trimmed = strValue.trim();
+  
+  // 检查路径遍历攻击
+  if (trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\')) {
+    throw new Error('Invalid path component: path traversal detected');
+  }
+  
+  // 检查绝对路径
+  if (path.isAbsolute(trimmed)) {
+    throw new Error('Invalid path component: absolute path not allowed');
+  }
+  
+  // 检查空字节注入
+  if (trimmed.includes('\0')) {
+    throw new Error('Invalid path component: null byte detected');
+  }
+  
+  // 限制长度
+  if (trimmed.length > 255) {
+    throw new Error('Invalid path component: too long');
+  }
+  
+  return trimmed;
+}
+
+/**
+ * 验证并构建安全的会话文件路径
+ * @param projectId 项目ID
+ * @param sessionId 会话ID
+ * @returns 安全的文件路径
+ */
+function buildSecureSessionPath(projectId: string | string[] | undefined, sessionId: string | string[] | undefined): string {
+  const safeProjectId = sanitizePathComponent(projectId);
+  const safeSessionId = sanitizePathComponent(sessionId);
+  
+  // 确保 sessionId 以 session- 开头且以 .jsonl 结尾
+  if (!safeSessionId.startsWith('session-')) {
+    throw new Error('Invalid session ID: must start with "session-"');
+  }
+  
+  const sessionFile = path.join(PROJECTS_DIR, safeProjectId, `${safeSessionId}.jsonl`);
+  
+  // 最终验证：确保路径在 PROJECTS_DIR 内
+  const resolvedPath = path.resolve(sessionFile);
+  const resolvedBase = path.resolve(PROJECTS_DIR);
+  
+  if (!resolvedPath.startsWith(resolvedBase)) {
+    throw new Error('Invalid path: attempted to access outside projects directory');
+  }
+  
+  return sessionFile;
+}
+
+/**
+ * 验证并构建安全的项目目录路径
+ * @param projectId 项目ID
+ * @returns 安全的目录路径
+ */
+function buildSecureProjectPath(projectId: string | string[] | undefined): string {
+  const safeProjectId = sanitizePathComponent(projectId);
+  const projectPath = path.join(PROJECTS_DIR, safeProjectId);
+  
+  // 最终验证：确保路径在 PROJECTS_DIR 内
+  const resolvedPath = path.resolve(projectPath);
+  const resolvedBase = path.resolve(PROJECTS_DIR);
+  
+  if (!resolvedPath.startsWith(resolvedBase)) {
+    throw new Error('Invalid path: attempted to access outside projects directory');
+  }
+  
+  return projectPath;
+}
+
+// ==================== 速率限制中间件 ====================
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+/**
+ * 简单的内存速率限制中间件
+ * @param windowMs 时间窗口（毫秒）
+ * @param max 最大请求数
+ */
+function createRateLimiter(windowMs: number = 15 * 60 * 1000, max: number = 100) {
+  return (req: Request, res: Response, next: Function) => {
+    // 获取客户端 IP
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const key = `${ip}:${req.path}`;
+    const now = Date.now();
+    
+    const entry = rateLimitStore.get(key);
+    
+    if (!entry || now > entry.resetTime) {
+      // 创建新条目
+      rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+      return next();
+    }
+    
+    if (entry.count >= max) {
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      res.setHeader('Retry-After', retryAfter.toString());
+      return res.status(429).json({ 
+        error: 'Too many requests', 
+        message: `Rate limit exceeded. Retry after ${retryAfter} seconds.` 
+      });
+    }
+    
+    entry.count++;
+    next();
+  };
+}
+
+// 定期清理过期的速率限制条目
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 60 * 1000); // 每分钟清理一次
+
 // 全局变量
 const app = express();
 // 修正：从当前目录（项目根目录）而不是 dist 目录查找 public 文件夹
@@ -120,6 +263,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(currentDir, 'public')));
+
+// API 速率限制（每 15 分钟最多 200 次请求）
+const apiRateLimiter = createRateLimiter(15 * 60 * 1000, 200);
+app.use('/api/', apiRateLimiter);
 
 // 创建 HTTP 服务器用于 WebSocket
 const server = http.createServer(app);
@@ -321,7 +468,14 @@ app.get('/api/projects', async (req: Request, res: Response) => {
 app.get('/api/sessions/:projectId/:sessionId', async (req: Request, res: Response) => {
   try {
     const { projectId, sessionId } = req.params;
-    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    
+    // 使用安全验证函数构建路径
+    let sessionFile: string;
+    try {
+      sessionFile = buildSecureSessionPath(projectId, sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
 
     const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
     if (!fileExists) {
@@ -336,7 +490,7 @@ app.get('/api/sessions/:projectId/:sessionId', async (req: Request, res: Respons
     res.json(messages);
   } catch (error) {
     console.error('Error reading session:', error);
-    res.status(500).json({ error: 'Failed to read session', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to read session' });
   }
 });
 
@@ -427,38 +581,37 @@ app.get('/api/search', async (req: Request, res: Response) => {
 app.get('/api/open-directory/:projectId', async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
-    const projectPath = path.join(PROJECTS_DIR, String(projectId));
+    
+    // 使用安全验证函数构建路径
+    let projectPath: string;
+    try {
+      projectPath = buildSecureProjectPath(projectId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project ID', message: (securityError as Error).message });
+    }
 
     const dirExists = await fs.access(projectPath).then(() => true).catch(() => false);
     if (!dirExists) {
       return res.status(404).json({ error: 'Project directory not found' });
     }
 
-    const { exec, spawn } = require('child_process');
+    const { spawn } = require('child_process');
 
     if (process.platform === 'win32') {
-      spawn('explorer.exe', [projectPath], { detached: true });
+      spawn('explorer.exe', [projectPath], { detached: true, stdio: 'ignore' });
       res.json({ success: true, path: projectPath });
     } else if (process.platform === 'darwin') {
-      exec(`open "${projectPath}"`, (error: Error | null) => {
-        if (error) {
-          console.error('Failed to open directory:', error);
-          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
-        }
-        res.json({ success: true, path: projectPath });
-      });
+      // 使用 spawn 替代 exec，避免命令注入
+      spawn('open', [projectPath], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: projectPath });
     } else {
-      exec(`xdg-open "${projectPath}"`, (error: Error | null) => {
-        if (error) {
-          console.error('Failed to open directory:', error);
-          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
-        }
-        res.json({ success: true, path: projectPath });
-      });
+      // Linux 使用 spawn 替代 exec
+      spawn('xdg-open', [projectPath], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: projectPath });
     }
   } catch (error) {
     console.error('Error opening directory:', error);
-    res.status(500).json({ error: 'Failed to open directory', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to open directory' });
   }
 });
 
@@ -466,7 +619,14 @@ app.get('/api/open-directory/:projectId', async (req: Request, res: Response) =>
 app.get('/api/open-workdir/:projectId/:sessionId', async (req: Request, res: Response) => {
   try {
     const { projectId, sessionId } = req.params;
-    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    
+    // 使用安全验证函数构建路径
+    let sessionFile: string;
+    try {
+      sessionFile = buildSecureSessionPath(projectId, sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
 
     const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
     if (!fileExists) {
@@ -491,37 +651,30 @@ app.get('/api/open-workdir/:projectId/:sessionId', async (req: Request, res: Res
       return res.status(400).json({ error: 'No working directory found in session' });
     }
 
+    // 验证工作目录路径安全性
+    const resolvedWorkingDir = path.resolve(workingDir);
+    
     // 检查工作目录是否存在
-    const dirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    const dirExists = await fs.access(resolvedWorkingDir).then(() => true).catch(() => false);
     if (!dirExists) {
-      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+      return res.status(404).json({ error: 'Working directory does not exist' });
     }
 
-    const { exec, spawn } = require('child_process');
+    const { spawn } = require('child_process');
 
     if (process.platform === 'win32') {
-      spawn('explorer.exe', [workingDir], { detached: true });
-      res.json({ success: true, path: workingDir });
+      spawn('explorer.exe', [resolvedWorkingDir], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: resolvedWorkingDir });
     } else if (process.platform === 'darwin') {
-      exec(`open "${workingDir}"`, (error: Error | null) => {
-        if (error) {
-          console.error('Failed to open working directory:', error);
-          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
-        }
-        res.json({ success: true, path: workingDir });
-      });
+      spawn('open', [resolvedWorkingDir], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: resolvedWorkingDir });
     } else {
-      exec(`xdg-open "${workingDir}"`, (error: Error | null) => {
-        if (error) {
-          console.error('Failed to open working directory:', error);
-          return res.status(500).json({ error: 'Failed to open directory', message: error.message });
-        }
-        res.json({ success: true, path: workingDir });
-      });
+      spawn('xdg-open', [resolvedWorkingDir], { detached: true, stdio: 'ignore' });
+      res.json({ success: true, path: resolvedWorkingDir });
     }
   } catch (error) {
     console.error('Error opening working directory:', error);
-    res.status(500).json({ error: 'Failed to open directory', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to open directory' });
   }
 });
 
@@ -529,7 +682,14 @@ app.get('/api/open-workdir/:projectId/:sessionId', async (req: Request, res: Res
 app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
-    const projectDir = path.join(PROJECTS_DIR, String(projectId));
+    
+    // 使用安全验证函数构建路径
+    let projectDir: string;
+    try {
+      projectDir = buildSecureProjectPath(projectId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project ID', message: (securityError as Error).message });
+    }
 
     // 检查项目目录是否存在
     const dirExists = await fs.access(projectDir).then(() => true).catch(() => false);
@@ -558,34 +718,48 @@ app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response
     // 从最新的会话中获取工作目录
     let workingDir: string | null = null;
     for (const { file } of fileStats) {
-      const sessionFile = path.join(projectDir, file);
-      const content = await fs.readFile(sessionFile, 'utf8');
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      for (const line of lines) {
-        const msg: Message = JSON.parse(line);
-        if (msg.type === 'user' && msg.cwd) {
-          workingDir = msg.cwd;
-          break;
+      try {
+        const sessionFile = path.join(projectDir, file);
+        const content = await fs.readFile(sessionFile, 'utf8');
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          try {
+            const msg: Message = JSON.parse(line);
+            if (msg.type === 'user' && msg.cwd) {
+              workingDir = msg.cwd;
+              break;
+            }
+          } catch {
+            // 跳过解析失败的行
+            continue;
+          }
         }
+        if (workingDir) break;
+      } catch {
+        // 文件可能已被删除或正在写入，跳过此文件继续尝试下一个
+        continue;
       }
-      if (workingDir) break;
     }
 
     if (!workingDir) {
       return res.status(400).json({ error: 'No working directory found in project sessions' });
     }
 
+    // 验证并规范化工作目录路径
+    const resolvedWorkingDir = path.resolve(workingDir);
+    
     // 检查工作目录是否存在
-    const workDirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    const workDirExists = await fs.access(resolvedWorkingDir).then(() => true).catch(() => false);
     if (!workDirExists) {
-      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+      return res.status(404).json({ error: 'Working directory does not exist' });
     }
 
     const { spawn } = require('child_process');
 
     if (process.platform === 'win32') {
-      const psScript = `Set-Location -Path '${workingDir}'; Write-Host 'Working directory: ${workingDir}'; Write-Host 'Starting iflow...'; iflow`;
+      // 使用 Base64 编码避免路径中的特殊字符问题
+      const psScript = `Set-Location -LiteralPath '${resolvedWorkingDir.replace(/'/g, "''")}'; Write-Host 'Working directory: ${resolvedWorkingDir}'; Write-Host 'Starting iflow...'; iflow`;
       const base64Command = Buffer.from(psScript, 'utf16le').toString('base64');
       
       const child = spawn('cmd.exe', [
@@ -601,17 +775,20 @@ app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response
       });
       child.unref();
       
-      console.log(`Opening iflow in project: ${workingDir}`);
-      res.json({ success: true, path: workingDir });
+      console.log(`Opening iflow in project: ${resolvedWorkingDir}`);
+      res.json({ success: true, path: resolvedWorkingDir });
     } else if (process.platform === 'darwin') {
-      const script = `tell application "Terminal" to do script "cd '${workingDir}' && iflow"`;
+      // 使用 sed 转义路径中的单引号
+      const escapedPath = resolvedWorkingDir.replace(/'/g, "'\\''");
+      const script = `tell application "Terminal" to do script "cd '${escapedPath}' && iflow"`;
       spawn('osascript', ['-e', script], { detached: true, stdio: 'ignore' });
-      res.json({ success: true, path: workingDir });
+      res.json({ success: true, path: resolvedWorkingDir });
     } else {
+      // Linux 终端，使用参数数组避免命令注入
       const terminals = [
-        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
-        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
-        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd '${resolvedWorkingDir.replace(/'/g, "'\\''")}' && iflow; exec bash`] },
+        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd '${resolvedWorkingDir.replace(/'/g, "'\\''")}' && iflow; exec bash`] },
+        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd '${resolvedWorkingDir.replace(/'/g, "'\\''")}' && iflow; exec bash`] },
       ];
 
       let launched = false;
@@ -626,14 +803,14 @@ app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response
       }
 
       if (launched) {
-        res.json({ success: true, path: workingDir });
+        res.json({ success: true, path: resolvedWorkingDir });
       } else {
         res.status(500).json({ error: 'No suitable terminal emulator found' });
       }
     }
   } catch (error) {
     console.error('Error opening iflow for project:', error);
-    res.status(500).json({ error: 'Failed to open iflow', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to open iflow' });
   }
 });
 
@@ -641,7 +818,14 @@ app.get('/api/open-iflow-project/:projectId', async (req: Request, res: Response
 app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Response) => {
   try {
     const { projectId, sessionId } = req.params;
-    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    
+    // 使用安全验证函数构建路径
+    let sessionFile: string;
+    try {
+      sessionFile = buildSecureSessionPath(projectId, sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
 
     const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
     if (!fileExists) {
@@ -666,20 +850,22 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
       return res.status(400).json({ error: 'No working directory found in session' });
     }
 
+    // 验证并规范化工作目录路径
+    const resolvedWorkingDir = path.resolve(workingDir);
+    
     // 检查工作目录是否存在
-    const dirExists = await fs.access(workingDir).then(() => true).catch(() => false);
+    const dirExists = await fs.access(resolvedWorkingDir).then(() => true).catch(() => false);
     if (!dirExists) {
-      return res.status(404).json({ error: 'Working directory does not exist', path: workingDir });
+      return res.status(404).json({ error: 'Working directory does not exist' });
     }
 
     const { spawn } = require('child_process');
 
     if (process.platform === 'win32') {
-      // Windows: 使用 cmd.exe 的 start 命令启动新的 PowerShell 窗口
-      const psScript = `Set-Location -Path '${workingDir}'; Write-Host 'Working directory: ${workingDir}'; Write-Host 'Starting iflow...'; iflow`;
+      // Windows: 使用 Base64 编码避免路径中的特殊字符问题
+      const psScript = `Set-Location -LiteralPath '${resolvedWorkingDir.replace(/'/g, "''")}'; Write-Host 'Working directory: ${resolvedWorkingDir}'; Write-Host 'Starting iflow...'; iflow`;
       const base64Command = Buffer.from(psScript, 'utf16le').toString('base64');
       
-      // 使用 cmd.exe start 命令启动新窗口
       const child = spawn('cmd.exe', [
         '/c',
         'start',
@@ -693,19 +879,21 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
       });
       child.unref();
       
-      console.log(`Opening iflow in: ${workingDir}`);
-      res.json({ success: true, path: workingDir });
+      console.log(`Opening iflow in: ${resolvedWorkingDir}`);
+      res.json({ success: true, path: resolvedWorkingDir });
     } else if (process.platform === 'darwin') {
-      // macOS: 打开 Terminal 并执行 iflow
-      const script = `tell application "Terminal" to do script "cd '${workingDir}' && iflow"`;
+      // macOS: 转义路径中的单引号
+      const escapedPath = resolvedWorkingDir.replace(/'/g, "'\\''");
+      const script = `tell application "Terminal" to do script "cd '${escapedPath}' && iflow"`;
       spawn('osascript', ['-e', script], { detached: true, stdio: 'ignore' });
-      res.json({ success: true, path: workingDir });
+      res.json({ success: true, path: resolvedWorkingDir });
     } else {
       // Linux: 尝试使用常见的终端模拟器
+      const escapedPath = resolvedWorkingDir.replace(/'/g, "'\\''");
       const terminals = [
-        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
-        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
-        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd "${workingDir}" && iflow; exec bash`] },
+        { cmd: 'gnome-terminal', args: ['--', 'bash', '-c', `cd '${escapedPath}' && iflow; exec bash`] },
+        { cmd: 'konsole', args: ['-e', 'bash', '-c', `cd '${escapedPath}' && iflow; exec bash`] },
+        { cmd: 'xterm', args: ['-e', 'bash', '-c', `cd '${escapedPath}' && iflow; exec bash`] },
       ];
 
       let launched = false;
@@ -720,14 +908,14 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
       }
 
       if (launched) {
-        res.json({ success: true, path: workingDir });
+        res.json({ success: true, path: resolvedWorkingDir });
       } else {
         res.status(500).json({ error: 'No suitable terminal emulator found' });
       }
     }
   } catch (error) {
     console.error('Error opening iflow:', error);
-    res.status(500).json({ error: 'Failed to open iflow', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to open iflow' });
   }
 });
 
@@ -735,7 +923,14 @@ app.get('/api/open-iflow/:projectId/:sessionId', async (req: Request, res: Respo
 app.delete('/api/sessions/:projectId/:sessionId', async (req: Request, res: Response) => {
   try {
     const { projectId, sessionId } = req.params;
-    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    
+    // 使用安全验证函数构建路径
+    let sessionFile: string;
+    try {
+      sessionFile = buildSecureSessionPath(projectId, sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
 
     // 检查文件是否存在
     const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
@@ -761,7 +956,7 @@ app.delete('/api/sessions/:projectId/:sessionId', async (req: Request, res: Resp
     res.json({ success: true, message: 'Session deleted successfully' });
   } catch (error) {
     console.error('Error deleting session:', error);
-    res.status(500).json({ error: 'Failed to delete session', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to delete session' });
   }
 });
 
@@ -772,8 +967,21 @@ app.post('/api/sessions/batch-delete', async (req: Request, res: Response) => {
   try {
     const { sessions } = req.body;
     
+    // 输入验证
     if (!sessions || !Array.isArray(sessions) || sessions.length === 0) {
       return res.status(400).json({ error: 'No sessions provided' });
+    }
+    
+    // 限制批量操作数量
+    if (sessions.length > 100) {
+      return res.status(400).json({ error: 'Too many sessions in batch (max 100)' });
+    }
+    
+    // 验证每个会话对象的结构
+    for (const s of sessions) {
+      if (!s || typeof s.projectId !== 'string' || typeof s.sessionId !== 'string') {
+        return res.status(400).json({ error: 'Invalid session format: each session must have projectId and sessionId as strings' });
+      }
     }
 
     const results: Array<{ projectId: string; sessionId: string; success: boolean; error?: string }> = [];
@@ -781,7 +989,15 @@ app.post('/api/sessions/batch-delete', async (req: Request, res: Response) => {
 
     for (const { projectId, sessionId } of sessions) {
       try {
-        const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+        // 使用安全验证函数构建路径
+        let sessionFile: string;
+        try {
+          sessionFile = buildSecureSessionPath(projectId, sessionId);
+        } catch (securityError) {
+          results.push({ projectId, sessionId, success: false, error: 'Invalid project or session ID' });
+          continue;
+        }
+        
         const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
         
         if (fileExists) {
@@ -792,7 +1008,7 @@ app.post('/api/sessions/batch-delete', async (req: Request, res: Response) => {
           results.push({ projectId, sessionId, success: false, error: 'Session not found' });
         }
       } catch (err) {
-        results.push({ projectId, sessionId, success: false, error: (err as Error).message });
+        results.push({ projectId, sessionId, success: false, error: 'Failed to delete' });
       }
     }
 
@@ -814,7 +1030,7 @@ app.post('/api/sessions/batch-delete', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error batch deleting sessions:', error);
-    res.status(500).json({ error: 'Failed to batch delete sessions', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to batch delete sessions' });
   }
 });
 
@@ -853,11 +1069,28 @@ app.post('/api/tags', async (req: Request, res: Response) => {
   try {
     const { name, color } = req.body;
     
+    // 输入验证
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Tag name is required' });
     }
 
     const tagName = name.toLowerCase().trim();
+    
+    // 限制标签名称长度
+    if (tagName.length === 0 || tagName.length > 50) {
+      return res.status(400).json({ error: 'Tag name must be between 1 and 50 characters' });
+    }
+    
+    // 验证标签名称格式（只允许字母、数字、中文、连字符和下划线）
+    if (!/^[\w\u4e00-\u9fa5-]+$/.test(tagName)) {
+      return res.status(400).json({ error: 'Tag name can only contain letters, numbers, Chinese characters, hyphens and underscores' });
+    }
+    
+    // 验证颜色格式
+    if (color && !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+      return res.status(400).json({ error: 'Invalid color format (must be #RRGGBB)' });
+    }
+
     const tagsData = await readTagsData();
 
     if (tagsData.tags[tagName]) {
@@ -877,7 +1110,7 @@ app.post('/api/tags', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error adding tag:', error);
-    res.status(500).json({ error: 'Failed to add tag', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to add tag' });
   }
 });
 
@@ -931,16 +1164,41 @@ app.post('/api/sessions/:projectId/:sessionId/tags', async (req: Request, res: R
   try {
     const { projectId, sessionId } = req.params;
     const { tags } = req.body;
-    const sessionKey = `${projectId}/${sessionId}`;
+    
+    // 验证路径参数
+    try {
+      sanitizePathComponent(projectId);
+      sanitizePathComponent(sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
 
+    // 输入验证
     if (!Array.isArray(tags)) {
       return res.status(400).json({ error: 'Tags must be an array' });
     }
+    
+    // 限制标签数量
+    if (tags.length > 20) {
+      return res.status(400).json({ error: 'Too many tags (max 20)' });
+    }
+
+    const sessionKey = `${projectId}/${sessionId}`;
 
     const tagsData = await readTagsData();
 
-    // 标准化标签名称（小写）
-    const normalizedTags = tags.map(t => t.toLowerCase().trim()).filter(t => t);
+    // 标准化并验证标签名称
+    const normalizedTags: string[] = [];
+    for (const t of tags) {
+      if (typeof t !== 'string') continue;
+      const tagName = t.toLowerCase().trim();
+      
+      // 跳过无效标签
+      if (tagName.length === 0 || tagName.length > 50) continue;
+      if (!/^[\w\u4e00-\u9fa5-]+$/.test(tagName)) continue;
+      
+      normalizedTags.push(tagName);
+    }
 
     // 确保所有标签都存在
     for (const tagName of normalizedTags) {
@@ -964,7 +1222,7 @@ app.post('/api/sessions/:projectId/:sessionId/tags', async (req: Request, res: R
     res.json({ success: true, tags: normalizedTags });
   } catch (error) {
     console.error('Error setting session tags:', error);
-    res.status(500).json({ error: 'Failed to set session tags', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to set session tags' });
   }
 });
 
@@ -1084,6 +1342,22 @@ async function extractSessionMetadata(sessionFile: string): Promise<SessionMetad
 
 // ==================== v1.3.0 P1 AI 功能 API ====================
 
+// 带超时的 fetch 辅助函数
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 30000): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // AI 配置存储路径
 const AI_CONFIG_FILE = path.join(IFLOW_DIR, 'iflow-run-ai-config.json');
 
@@ -1191,19 +1465,27 @@ app.post('/api/ai/test', async (req: Request, res: Response) => {
       ? 'https://apis.iflow.cn/v1'
       : 'https://api.openai.com/v1';
     
-    // 发送测试请求
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [{ role: 'user', content: 'Hello' }],
-        max_tokens: 10
-      })
-    });
+    // 发送测试请求（10秒超时）
+    let response: globalThis.Response;
+    try {
+      response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 10
+        })
+      }, 10000);
+    } catch (fetchError) {
+      const errorMsg = (fetchError as Error).name === 'AbortError' 
+        ? 'Request timeout (10s)' 
+        : (fetchError as Error).message;
+      return res.status(504).json({ error: 'API connection timeout', message: errorMsg });
+    }
     
     if (response.ok) {
       res.json({ success: true, message: 'API 连接成功' });
@@ -1216,7 +1498,7 @@ app.post('/api/ai/test', async (req: Request, res: Response) => {
     }
   } catch (error) {
     console.error('Error testing AI connection:', error);
-    res.status(500).json({ error: 'Failed to test AI connection', message: (error as Error).message });
+    res.status(500).json({ error: 'Failed to test AI connection' });
   }
 });
 
@@ -1253,19 +1535,28 @@ ${context.sessionSummary ? `会话摘要: ${context.sessionSummary}` : ''}` : ''
 请用中文回答，保持简洁专业。`
     };
     
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [systemMessage, ...messages],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
-    });
+    // 发送请求（60秒超时）
+    let response: globalThis.Response;
+    try {
+      response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [systemMessage, ...messages],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      }, 60000);
+    } catch (fetchError) {
+      const errorMsg = (fetchError as Error).name === 'AbortError' 
+        ? 'Request timeout (60s)' 
+        : (fetchError as Error).message;
+      return res.status(504).json({ error: 'AI API timeout', message: errorMsg });
+    }
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({})) as { error?: { message?: string }; status?: string; msg?: string };
@@ -1309,8 +1600,14 @@ app.post('/api/ai/analyze', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'AI service not configured or disabled' });
     }
     
-    // 读取会话内容
-    const sessionFile = path.join(PROJECTS_DIR, String(projectId), `${String(sessionId)}.jsonl`);
+    // 使用安全验证函数构建路径
+    let sessionFile: string;
+    try {
+      sessionFile = buildSecureSessionPath(projectId, sessionId);
+    } catch (securityError) {
+      return res.status(400).json({ error: 'Invalid project or session ID', message: (securityError as Error).message });
+    }
+    
     const fileExists = await fs.access(sessionFile).then(() => true).catch(() => false);
     
     if (!fileExists) {
@@ -1379,19 +1676,28 @@ ${summary || '（无摘要）'}
       ? 'https://apis.iflow.cn/v1'
       : 'https://api.openai.com/v1';
     
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 2000
-      })
-    });
+    // 发送请求（60秒超时）
+    let response: globalThis.Response;
+    try {
+      response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [{ role: 'user', content: analysisPrompt }],
+          temperature: 0.3,
+          max_tokens: 2000
+        })
+      }, 60000);
+    } catch (fetchError) {
+      const errorMsg = (fetchError as Error).name === 'AbortError' 
+        ? 'Request timeout (60s)' 
+        : (fetchError as Error).message;
+      return res.status(504).json({ error: 'AI API timeout', message: errorMsg });
+    }
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({})) as { error?: { message?: string }; status?: string; msg?: string };

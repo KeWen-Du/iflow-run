@@ -382,6 +382,27 @@ function setupEventListeners() {
     });
   }
 
+  // 项目列表点击事件（使用事件委托，只绑定一次）
+  if (projectsList) {
+    projectsList.addEventListener('click', (e) => {
+      // 检查是否点击了打开 iflow 按钮
+      const openIflowBtnInList = e.target.closest('.project-open-iflow');
+      if (openIflowBtnInList) {
+        e.stopPropagation();
+        const projectId = openIflowBtnInList.dataset.projectId;
+        openIflowForProject(projectId);
+        return;
+      }
+
+      // 检查是否点击了项目项
+      const projectItem = e.target.closest('.project-item');
+      if (projectItem) {
+        const projectId = projectItem.dataset.projectId;
+        selectProject(projectId);
+      }
+    });
+  }
+
   // 打开 iflow 功能
   if (openIflowBtn) {
     openIflowBtn.addEventListener('click', () => {
@@ -563,24 +584,7 @@ function renderProjectsList() {
     </div>
   `).join('');
 
-  // 添加点击事件（使用事件委托）
-  projectsList.addEventListener('click', (e) => {
-    // 检查是否点击了打开 iflow 按钮
-    const openIflowBtn = e.target.closest('.project-open-iflow');
-    if (openIflowBtn) {
-      e.stopPropagation();
-      const projectId = openIflowBtn.dataset.projectId;
-      openIflowForProject(projectId);
-      return;
-    }
-
-    // 检查是否点击了项目项
-    const projectItem = e.target.closest('.project-item');
-    if (projectItem) {
-      const projectId = projectItem.dataset.projectId;
-      selectProject(projectId);
-    }
-  });
+  // 注意：事件监听器已移到 setupEventListeners() 中，避免重复绑定
 }
 
 // 选择项目
