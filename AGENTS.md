@@ -4,11 +4,28 @@
 
 - **GitHub**: https://github.com/KeWen-Du/iflow-run
 - **npm**: https://www.npmjs.com/package/iflow-run
-- **版本**: 1.4.0
+- **版本**: 1.4.1
 - **作者**: dukewen <dukewen666@gmail.com>
 - **许可证**: MIT
 
 ## 更新日志
+
+### v1.4.1 (2026-03-08)
+
+**安全修复**
+- 🔒 **路径遍历漏洞修复** - 添加路径验证函数，防止攻击者通过 `../` 访问任意文件
+- 🔒 **命令注入风险修复** - 将 `exec` 替换为 `spawn`，防止命令注入攻击
+
+**安全增强**
+- 🛡️ **API 速率限制** - 添加速率限制中间件，API 请求限制为每 IP 每 15 分钟 200 次，敏感操作限制为 20 次
+- ⏱️ **请求超时机制** - 外部 AI API 请求添加超时机制（测试连接 10s，AI 对话/分析 60s）
+- ✅ **输入验证增强** - 完善批量操作和标签接口的输入验证，限制字符串长度和格式
+
+**技术细节**
+- 新增 `sanitizePathComponent()` 函数验证路径组件安全性
+- 新增 `buildSecureSessionPath()` 和 `buildSecureProjectPath()` 函数构建安全路径
+- 新增 `fetchWithTimeout()` 函数实现带超时的 HTTP 请求
+- 新增内存速率限制中间件 `rateLimitMiddleware()`
 
 ### v1.3.0 (2026-03-07)
 
