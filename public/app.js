@@ -1480,7 +1480,7 @@ function escapeHtmlWithLineBreaks(text) {
 // ==================== 设置面板功能 ====================
 
 // 显示设置面板
-function showSettingsModal() {
+async function showSettingsModal() {
   const settingsModalEl = document.getElementById('settingsModal');
   if (!settingsModalEl) return;
 
@@ -3119,9 +3119,9 @@ async function loadAISettings() {
 
 // 覆盖原始的 showSettingsModal 函数
 const originalShowSettingsModal = showSettingsModal;
-window.showSettingsModal = function() {
-  originalShowSettingsModal();
-  loadAISettings();
+window.showSettingsModal = async function() {
+  await originalShowSettingsModal();
+  await loadAISettings();
 };
 
 // 覆盖原始的 saveSettings 函数
