@@ -1622,12 +1622,20 @@ app.post('/api/ai/analyze', async (req: Request, res: Response) => {
     let totalTokens = 0;
     let toolCalls: string[] = [];
     let errors = 0;
+    const userMessages: Array<{ index: number; content: string }> = [];
     
-    for (const msg of messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
       if (msg.type === 'user') {
         const msgContent = extractContent(msg);
-        if (msgContent && !summary) {
-          summary = msgContent.substring(0, 500);
+        if (msgContent) {
+          if (!summary) {
+            summary = msgContent.substring(0, 500);
+          }
+          // 提取用户消息用于提问改进建议（最多5条，每条截取前200字）
+          if (userMessages.length < 5) {
+            userMessages.push({ index: i + 1, content: msgContent.substring(0, 200) });
+          }
         }
       }
       if (msg.message?.usage) {
@@ -1654,6 +1662,9 @@ app.post('/api/ai/analyze', async (req: Request, res: Response) => {
 工具使用情况：
 ${toolCalls.length > 0 ? [...new Set(toolCalls)].map(t => `- ${t}: ${toolCalls.filter(x => x === t).length} 次`).join('\n') : '- 无工具调用'}
 
+用户提问列表：
+${userMessages.length > 0 ? userMessages.map((m, i) => `${i + 1}. ${m.content}`).join('\n') : '无用户提问'}
+
 会话内容摘要：
 ${summary || '（无摘要）'}
 
@@ -1667,8 +1678,17 @@ ${summary || '（无摘要）'}
     "complexity": "复杂度评估（高/中/低）",
     "quality": "代码质量评估（高/中/低）"
   },
-  "suggestions": ["改进建议1", "改进建议2"]
+  "suggestions": ["改进建议1", "改进建议2"],
+  "promptImprovements": [
+    {
+      "original": "用户原始提问",
+      "improved": "改进后的提问示例",
+      "reason": "改进理由（简短说明为什么这样改更好）"
+    }
+  ]
 }
+
+注意：promptImprovements 只针对可以明显改进的提问，如果提问已经很清晰则不需要改进。最多返回 3 条改进建议。
 
 只返回 JSON，不要包含其他内容。`;
 

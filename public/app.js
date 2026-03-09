@@ -2776,6 +2776,37 @@ function renderAnalysisResult(analysis) {
   } else {
     suggestionsEl.innerHTML = '<p style="color: var(--text-muted);">暂无改进建议</p>';
   }
+  
+  // 提问改进建议
+  const improvementsEl = document.getElementById('analysisPromptImprovements');
+  const improvementsSection = document.getElementById('promptImprovementsSection');
+  
+  if (analysis.promptImprovements && analysis.promptImprovements.length > 0) {
+    improvementsSection.style.display = 'block';
+    improvementsEl.innerHTML = analysis.promptImprovements.map((item, index) => `
+      <div class="prompt-improvement-item">
+        <div class="prompt-improvement-header">
+          <span class="prompt-improvement-index">#${index + 1}</span>
+        </div>
+        <div class="prompt-improvement-comparison">
+          <div class="prompt-improvement-original">
+            <div class="prompt-improvement-label">当前提问</div>
+            <div class="prompt-improvement-text">${escapeHtml(item.original)}</div>
+          </div>
+          <div class="prompt-improvement-arrow">→</div>
+          <div class="prompt-improvement-improved">
+            <div class="prompt-improvement-label">改进建议</div>
+            <div class="prompt-improvement-text">${escapeHtml(item.improved)}</div>
+          </div>
+        </div>
+        <div class="prompt-improvement-reason">
+          <strong>理由：</strong>${escapeHtml(item.reason)}
+        </div>
+      </div>
+    `).join('');
+  } else {
+    improvementsSection.style.display = 'none';
+  }
 }
 
 // 导出分析报告
