@@ -358,12 +358,26 @@
         </div>
         <div class="setting-item">
           <label class="setting-label">
+            <span>API Key 来源</span>
+          </label>
+          <select id="settingApiKeySource" class="setting-select">
+            <option value="env">环境变量（推荐）</option>
+            <option value="custom">自定义配置</option>
+          </select>
+        </div>
+        <div id="apiKeyEnvHint" class="setting-hint" style="margin: -8px 0 8px 0; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: var(--bg-tertiary); color: var(--text-muted);">
+          💡 环境变量名：<code id="envVarName" style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">IFLOW_API_KEY</code>
+        </div>
+        <div id="apiKeyCustomSection" class="setting-item" style="display: none;">
+          <label class="setting-label">
             <span>API Key</span>
           </label>
           <div style="display: flex; gap: 8px; flex: 1;">
             <input type="password" id="settingApiKey" class="setting-input" placeholder="输入 API Key..." style="flex: 1; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);">
-            <button id="testApiConnectionBtn" class="btn btn-secondary btn-small">测试连接</button>
           </div>
+        </div>
+        <div class="setting-item">
+          <button id="testApiConnectionBtn" class="btn btn-secondary btn-small" style="width: 100%;">测试连接</button>
         </div>
         <div class="setting-item">
           <label class="setting-label">
@@ -395,9 +409,6 @@
               <option value="deepseek-v3.2">DeepSeek-V3.2-Exp</option>
             </optgroup>
           </select>
-        </div>
-        <div id="apiKeySourceHint" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: var(--bg-tertiary); color: var(--text-muted);">
-          💡 已从环境变量读取 API Key
         </div>
         <div id="apiConnectionStatus" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
       </div>

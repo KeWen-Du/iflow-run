@@ -2933,13 +2933,49 @@ function initAIFeatures() {
     testApiConnectionBtn.addEventListener('click', testAPIConnection);
   }
   
+  // API Key 来源切换
+  const apiKeySourceSelect = document.getElementById('settingApiKeySource');
+  const aiProviderSelect = document.getElementById('settingAiProvider');
+  
+  if (apiKeySourceSelect) {
+    apiKeySourceSelect.addEventListener('change', updateApiKeySourceUI);
+  }
+  if (aiProviderSelect) {
+    aiProviderSelect.addEventListener('change', updateEnvVarName);
+  }
+  
   console.log('iflow-run v1.3.0 P1 AI features initialized');
+}
+
+// 更新 API Key 来源 UI
+function updateApiKeySourceUI() {
+  const source = document.getElementById('settingApiKeySource')?.value;
+  const envHint = document.getElementById('apiKeyEnvHint');
+  const customSection = document.getElementById('apiKeyCustomSection');
+  
+  if (source === 'env') {
+    if (envHint) envHint.style.display = 'block';
+    if (customSection) customSection.style.display = 'none';
+  } else {
+    if (envHint) envHint.style.display = 'none';
+    if (customSection) customSection.style.display = 'flex';
+  }
+}
+
+// 更新环境变量名提示
+function updateEnvVarName() {
+  const provider = document.getElementById('settingAiProvider')?.value;
+  const envVarName = document.getElementById('envVarName');
+  if (envVarName) {
+    envVarName.textContent = provider === 'iflow' ? 'IFLOW_API_KEY' : 'OPENAI_API_KEY';
+  }
 }
 
 // 测试 API 连接
 async function testAPIConnection() {
   const provider = document.getElementById('settingAiProvider').value;
-  const apiKey = document.getElementById('settingApiKey').value;
+  const apiKeySource = document.getElementById('settingApiKeySource').value;
+  const apiKey = document.getElementById('settingApiKey')?.value || '';
   const model = document.getElementById('settingAiModel').value;
 
   const statusEl = document.getElementById('apiConnectionStatus');
@@ -2948,23 +2984,26 @@ async function testAPIConnection() {
   statusEl.textContent = '保存配置中...';
 
   try {
-    // 先保存配置（如果输入框有值才保存，否则保留环境变量配置）
-    if (apiKey) {
-      const saveResponse = await fetch('/api/ai/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey, model })
-      });
+    // 保存配置
+    const saveResponse = await fetch('/api/ai/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        provider, 
+        apiKeySource,
+        apiKey: apiKeySource === 'custom' ? apiKey : '',
+        model 
+      })
+    });
 
-      if (!saveResponse.ok) {
-        const saveError = await saveResponse.json();
-        statusEl.className = 'error';
-        statusEl.textContent = '✗ 保存配置失败: ' + (saveError.error || saveError.message);
-        return;
-      }
+    if (!saveResponse.ok) {
+      const saveError = await saveResponse.json();
+      statusEl.className = 'error';
+      statusEl.textContent = '✗ 保存配置失败: ' + (saveError.error || saveError.message);
+      return;
     }
 
-    // 测试连接（后端会从环境变量读取 API Key）
+    // 测试连接
     statusEl.textContent = '测试连接中...';
     const response = await fetch('/api/ai/test', { method: 'POST' });
     const result = await response.json();
@@ -2993,6 +3032,7 @@ function saveSettingsWithAI() {
 
   // AI 设置
   const aiProvider = document.getElementById('settingAiProvider');
+  const apiKeySource = document.getElementById('settingApiKeySource');
   const apiKey = document.getElementById('settingApiKey');
   const aiModel = document.getElementById('settingAiModel');
 
@@ -3004,7 +3044,8 @@ function saveSettingsWithAI() {
     showToolStats: showToolStatsCheck?.checked !== false,
     ai: {
       provider: aiProvider?.value || 'iflow',
-      apiKey: apiKey?.value || '',
+      apiKeySource: apiKeySource?.value || 'env',
+      apiKey: apiKeySource?.value === 'custom' ? (apiKey?.value || '') : '',
       model: aiModel?.value || 'iflow-rome-30ba3b'
     }
   };
@@ -3015,13 +3056,11 @@ function saveSettingsWithAI() {
   localStorage.setItem('theme', settings.theme);
 
   // 保存到后端
-  if (settings.ai.apiKey) {
-    fetch('/api/ai/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings.ai)
-    });
-  }
+  fetch('/api/ai/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings.ai)
+  });
 
   // 应用主题
   if (settings.theme === 'light') {
@@ -3040,35 +3079,41 @@ async function loadAISettings() {
   const aiSettings = settings.ai || {};
 
   const aiProvider = document.getElementById('settingAiProvider');
+  const apiKeySource = document.getElementById('settingApiKeySource');
   const apiKey = document.getElementById('settingApiKey');
   const aiModel = document.getElementById('settingAiModel');
-  const apiKeySourceHint = document.getElementById('apiKeySourceHint');
 
-  // 从后端获取配置（检查环境变量）
+  // 从后端获取配置
   try {
     const response = await fetch('/api/ai/config');
     const config = await response.json();
 
     if (aiProvider) aiProvider.value = config.provider || 'iflow';
     if (aiModel) aiModel.value = config.model || 'iflow-rome-30ba3b';
-
-    // 如果 API Key 来自环境变量，显示提示
-    if (config.apiKeySource === 'env') {
-      if (apiKey) apiKey.placeholder = '已从环境变量读取';
-      if (apiKeySourceHint) {
-        apiKeySourceHint.style.display = 'block';
-        apiKeySourceHint.textContent = '💡 已从环境变量读取 API Key，无需手动配置';
-      }
-    } else {
-      if (apiKey) apiKey.value = aiSettings.apiKey || '';
-      if (apiKeySourceHint) apiKeySourceHint.style.display = 'none';
+    
+    // 设置 API Key 来源
+    const savedSource = aiSettings.apiKeySource || config.apiKeySource || 'env';
+    if (apiKeySource) apiKeySource.value = savedSource;
+    
+    // 更新环境变量名提示
+    updateEnvVarName();
+    
+    // 更新 UI 显示
+    updateApiKeySourceUI();
+    
+    // 如果是自定义配置，填入 API Key
+    if (savedSource === 'custom' && apiKey) {
+      apiKey.value = aiSettings.apiKey || config.apiKey || '';
     }
   } catch (error) {
     console.error('Failed to load AI config:', error);
     // 回退到本地设置
     if (aiProvider) aiProvider.value = aiSettings.provider || 'iflow';
+    if (apiKeySource) apiKeySource.value = aiSettings.apiKeySource || 'env';
     if (apiKey) apiKey.value = aiSettings.apiKey || '';
     if (aiModel) aiModel.value = aiSettings.model || 'iflow-rome-30ba3b';
+    updateEnvVarName();
+    updateApiKeySourceUI();
   }
 }
 

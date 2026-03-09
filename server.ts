@@ -1363,6 +1363,7 @@ const AI_CONFIG_FILE = path.join(IFLOW_DIR, 'iflow-run-ai-config.json');
 
 interface AIConfig {
   provider: 'iflow' | 'openai';
+  apiKeySource: 'env' | 'custom';
   apiKey: string;
   model: string;
 }
@@ -1379,6 +1380,7 @@ function getApiKeyFromEnv(provider: 'iflow' | 'openai'): string | undefined {
 async function readAIConfig(): Promise<AIConfig> {
   let config: AIConfig = {
     provider: 'iflow',
+    apiKeySource: 'env',
     apiKey: '',
     model: 'iflow-rome-30ba3b'
   };
@@ -1390,6 +1392,7 @@ async function readAIConfig(): Promise<AIConfig> {
       const savedConfig = JSON.parse(content);
       config = {
         provider: savedConfig.provider || 'iflow',
+        apiKeySource: savedConfig.apiKeySource || 'env',
         apiKey: savedConfig.apiKey || '',
         model: savedConfig.model || 'iflow-rome-30ba3b'
       };
@@ -1398,11 +1401,12 @@ async function readAIConfig(): Promise<AIConfig> {
     console.error('Error reading AI config:', error);
   }
 
-  // 如果配置文件中没有 API Key，尝试从环境变量获取
-  if (!config.apiKey) {
+  // 如果选择环境变量来源，从环境变量获取 API Key
+  if (config.apiKeySource === 'env' || !config.apiKey) {
     const envKey = getApiKeyFromEnv(config.provider);
     if (envKey) {
       config.apiKey = envKey;
+      config.apiKeySource = 'env';
     }
   }
 
@@ -1412,9 +1416,9 @@ async function readAIConfig(): Promise<AIConfig> {
 // 保存 AI 配置
 async function saveAIConfig(config: AIConfig): Promise<void> {
   try {
-    // 只保存非环境变量的配置，不保存 enabled 字段
     const configToSave = {
       provider: config.provider,
+      apiKeySource: config.apiKeySource,
       apiKey: config.apiKey,
       model: config.model
     };
@@ -1429,17 +1433,12 @@ async function saveAIConfig(config: AIConfig): Promise<void> {
 app.get('/api/ai/config', async (req: Request, res: Response) => {
   try {
     const config = await readAIConfig();
-    // 检查 API Key 来源
-    const envKey = getApiKeyFromEnv(config.provider);
-    const apiKeySource = config.apiKey
-      ? (envKey && config.apiKey === envKey ? 'env' : 'config')
-      : null;
-
+    
     res.json({
       provider: config.provider,
       hasApiKey: !!config.apiKey,
       apiKeyPreview: config.apiKey ? `${config.apiKey.substring(0, 8)}...` : '',
-      apiKeySource,
+      apiKeySource: config.apiKeySource,
       model: config.model
     });
   } catch (error) {
@@ -1451,10 +1450,11 @@ app.get('/api/ai/config', async (req: Request, res: Response) => {
 // 保存 AI 配置 API
 app.post('/api/ai/config', async (req: Request, res: Response) => {
   try {
-    const { provider, apiKey, model } = req.body;
+    const { provider, apiKeySource, apiKey, model } = req.body;
 
     const newConfig: AIConfig = {
       provider: provider || 'iflow',
+      apiKeySource: apiKeySource || 'env',
       apiKey: apiKey || '',
       model: model || 'iflow-rome-30ba3b'
     };
