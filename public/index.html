@@ -370,10 +370,30 @@
             <span>AI 模型</span>
           </label>
           <select id="settingAiModel" class="setting-select">
-            <option value="iflow-rome-30ba3b">iFlow-ROME-30B (推荐)</option>
-            <option value="qwen3-coder-plus">Qwen3-Coder-Plus</option>
-            <option value="qwen3-max">Qwen3-Max</option>
-            <option value="kimi-k2-0905">Kimi-K2</option>
+            <optgroup label="推荐模型">
+              <option value="iflow-rome-30ba3b">iFlow-ROME (推荐)</option>
+              <option value="qwen3-coder-plus">Qwen3-Coder-Plus</option>
+              <option value="qwen3-max">Qwen3-Max</option>
+            </optgroup>
+            <optgroup label="视觉模型">
+              <option value="qwen3-vl-plus">Qwen3-VL-Plus</option>
+            </optgroup>
+            <optgroup label="Kimi 系列">
+              <option value="kimi-k2-0905">Kimi-K2-Instruct</option>
+              <option value="kimi-k2">Kimi-K2</option>
+            </optgroup>
+            <optgroup label="Qwen 系列">
+              <option value="qwen3-max-preview">Qwen3-Max-Preview</option>
+              <option value="qwen3-32b">Qwen3-32B</option>
+              <option value="qwen3-235b-a22b-thinking-2507">Qwen3-235B-Thinking</option>
+              <option value="qwen3-235b-a22b-instruct">Qwen3-235B-Instruct</option>
+              <option value="qwen3-235b">Qwen3-235B</option>
+            </optgroup>
+            <optgroup label="DeepSeek 系列">
+              <option value="deepseek-r1">DeepSeek-R1 (推理)</option>
+              <option value="deepseek-v3">DeepSeek-V3-671B</option>
+              <option value="deepseek-v3.2">DeepSeek-V3.2-Exp</option>
+            </optgroup>
           </select>
         </div>
         <div id="apiKeySourceHint" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: var(--bg-tertiary); color: var(--text-muted);">
