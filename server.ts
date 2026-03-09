@@ -1479,15 +1479,15 @@ app.post('/api/ai/config', async (req: Request, res: Response) => {
 app.post('/api/ai/test', async (req: Request, res: Response) => {
   try {
     const config = await readAIConfig();
-    
+
     if (!config.apiKey) {
       return res.status(400).json({ error: 'API Key not configured' });
     }
-    
-    const baseUrl = config.provider === 'iflow' 
+
+    const baseUrl = config.provider === 'iflow'
       ? 'https://apis.iflow.cn/v1'
       : 'https://api.openai.com/v1';
-    
+
     // 发送测试请求（10秒超时）
     let response: globalThis.Response;
     try {
@@ -1499,25 +1499,48 @@ app.post('/api/ai/test', async (req: Request, res: Response) => {
         },
         body: JSON.stringify({
           model: config.model,
-          messages: [{ role: 'user', content: 'Hello' }],
-          max_tokens: 10
+          messages: [{ role: 'user', content: 'Say "test ok"' }],
+          max_tokens: 20
         })
       }, 10000);
     } catch (fetchError) {
-      const errorMsg = (fetchError as Error).name === 'AbortError' 
-        ? 'Request timeout (10s)' 
+      const errorMsg = (fetchError as Error).name === 'AbortError'
+        ? 'Request timeout (10s)'
         : (fetchError as Error).message;
       return res.status(504).json({ error: 'API connection timeout', message: errorMsg });
     }
-    
+
+    // 解析响应内容
+    let responseData: any;
+    try {
+      responseData = await response.json();
+    } catch {
+      return res.status(400).json({ error: 'API 返回格式错误', message: '无法解析响应内容' });
+    }
+
     if (response.ok) {
-      res.json({ success: true, message: 'API 连接成功' });
+      // 检查响应是否包含有效的 choices
+      if (responseData.choices && Array.isArray(responseData.choices) && responseData.choices.length > 0) {
+        res.json({ success: true, message: 'API 连接成功' });
+      } else if (responseData.error) {
+        // HTTP 200 但响应体包含错误信息
+        res.status(400).json({
+          error: 'API Key 无效',
+          message: responseData.error.message || JSON.stringify(responseData.error)
+        });
+      } else {
+        res.status(400).json({
+          error: 'API 响应异常',
+          message: '未返回有效内容，请检查 API Key 或模型配置'
+        });
+      }
     } else {
-      const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
-      res.status(400).json({ 
-        error: 'API 连接失败', 
-        message: errorData.error?.message || `HTTP ${response.status}`
-      });
+      // 解析错误信息
+      const errorMsg = responseData.error?.message
+        || responseData.message
+        || responseData.error
+        || `HTTP ${response.status}`;
+      res.status(400).json({ error: 'API 连接失败', message: errorMsg });
     }
   } catch (error) {
     console.error('Error testing AI connection:', error);

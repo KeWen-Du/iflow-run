@@ -2932,29 +2932,37 @@ async function testAPIConnection() {
   const provider = document.getElementById('settingAiProvider').value;
   const apiKey = document.getElementById('settingApiKey').value;
   const model = document.getElementById('settingAiModel').value;
-  
+
   if (!apiKey) {
     showToast('请输入 API Key', 'error');
     return;
   }
-  
+
   const statusEl = document.getElementById('apiConnectionStatus');
   statusEl.style.display = 'block';
   statusEl.className = '';
-  statusEl.textContent = '测试连接中...';
-  
+  statusEl.textContent = '保存配置中...';
+
   try {
     // 先保存配置
-    await fetch('/api/ai/config', {
+    const saveResponse = await fetch('/api/ai/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey, model, enabled: true })
+      body: JSON.stringify({ provider, apiKey, model })
     });
-    
+
+    if (!saveResponse.ok) {
+      const saveError = await saveResponse.json();
+      statusEl.className = 'error';
+      statusEl.textContent = '✗ 保存配置失败: ' + (saveError.error || saveError.message);
+      return;
+    }
+
     // 测试连接
+    statusEl.textContent = '测试连接中...';
     const response = await fetch('/api/ai/test', { method: 'POST' });
     const result = await response.json();
-    
+
     if (result.success) {
       statusEl.className = 'success';
       statusEl.textContent = '✓ ' + result.message;
