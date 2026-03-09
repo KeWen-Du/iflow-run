@@ -299,8 +299,9 @@ function showToast(message, type = 'success') {
 
 // 初始化
 async function init() {
-  // 加载主题设置
-  const savedTheme = localStorage.getItem('theme');
+  // 加载主题设置（优先从用户设置读取，兼容旧的 'theme' key）
+  const userSettings = getUserSettings();
+  const savedTheme = userSettings.theme || localStorage.getItem('theme');
   if (savedTheme === 'light') {
     document.body.classList.add('light-mode');
   }
@@ -378,7 +379,12 @@ function setupEventListeners() {
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
       document.body.classList.toggle('light-mode');
-      localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+      const newTheme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+      localStorage.setItem('theme', newTheme);
+      // 同步更新用户设置
+      const settings = getUserSettings();
+      settings.theme = newTheme;
+      saveUserSettings(settings);
     });
   }
 
@@ -1519,6 +1525,9 @@ function saveSettings() {
   };
 
   saveUserSettings(settings);
+
+  // 同步更新 'theme' key（兼容主题切换按钮）
+  localStorage.setItem('theme', settings.theme);
 
   // 应用主题
   if (settings.theme === 'light') {
@@ -3004,6 +3013,9 @@ function saveSettingsWithAI() {
   };
 
   saveUserSettings(settings);
+
+  // 同步更新 'theme' key（兼容主题切换按钮）
+  localStorage.setItem('theme', settings.theme);
 
   // 保存到后端
   if (settings.ai.apiKey) {
