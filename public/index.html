@@ -376,14 +376,8 @@
             <option value="kimi-k2-0905">Kimi-K2</option>
           </select>
         </div>
-        <div class="setting-item">
-          <label class="setting-label">
-            <span>启用 AI 助手</span>
-          </label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="settingEnableAiAssistant">
-            <span class="toggle-slider"></span>
-          </label>
+        <div id="apiKeySourceHint" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: var(--bg-tertiary); color: var(--text-muted);">
+          💡 已从环境变量读取 API Key
         </div>
         <div id="apiConnectionStatus" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
       </div>
@@ -426,22 +420,12 @@
     <div class="ai-welcome-message">
       <div class="ai-welcome-icon">👋</div>
       <div class="ai-welcome-text">
-        <p>你好！我是 AI 助手，可以帮助你：</p>
-        <ul>
-          <li>分析当前会话内容</li>
-          <li>解释代码和工具调用</li>
-          <li>回答技术问题</li>
-          <li>提供建议和优化方案</li>
-        </ul>
-        <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">请先在设置中配置 API Key 以启用 AI 功能</p>
+        <p>你好！我是 AI 助手，可以回答技术问题和提供建议。</p>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">在会话详情页点击"分析会话"可获取详细分析报告</p>
       </div>
     </div>
   </div>
   <div class="ai-chat-input-area">
-    <div class="ai-quick-actions">
-      <button class="ai-quick-action-btn" data-action="analyze">📊 分析当前会话</button>
-      <button class="ai-quick-action-btn" data-action="explain">💡 解释选中内容</button>
-    </div>
     <div class="ai-chat-input-wrapper">
       <textarea id="aiChatInput" placeholder="输入消息... (Shift+Enter 换行)" rows="1"></textarea>
       <button id="aiSendBtn" class="btn btn-primary btn-small" title="发送">

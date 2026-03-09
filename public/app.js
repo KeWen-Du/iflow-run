@@ -2507,10 +2507,10 @@ async function checkAIConfig() {
   try {
     const response = await fetch('/api/ai/config');
     const config = await response.json();
-    
+
     const welcomeMsg = document.querySelector('.ai-welcome-message p:last-child');
     if (welcomeMsg) {
-      if (config.enabled && config.hasApiKey) {
+      if (config.hasApiKey) {
         welcomeMsg.textContent = 'AI 助手已就绪，有什么可以帮助你的？';
         welcomeMsg.style.color = 'var(--accent-primary)';
       } else {
@@ -2637,14 +2637,8 @@ function clearAiChat() {
       <div class="ai-welcome-message">
         <div class="ai-welcome-icon">👋</div>
         <div class="ai-welcome-text">
-          <p>你好！我是 AI 助手，可以帮助你：</p>
-          <ul>
-            <li>分析当前会话内容</li>
-            <li>解释代码和工具调用</li>
-            <li>回答技术问题</li>
-            <li>提供建议和优化方案</li>
-          </ul>
-          <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">请先在设置中配置 API Key 以启用 AI 功能</p>
+          <p>你好！我是 AI 助手，可以回答技术问题和提供建议。</p>
+          <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">在会话详情页点击"分析会话"可获取详细分析报告</p>
         </div>
       </div>
     `;
@@ -2658,22 +2652,7 @@ function clearAiChat() {
   showToast('已创建新的 AI 会话');
 }
 
-// 快速操作处理
-function handleAiQuickAction(action) {
-  if (!currentSession) {
-    showToast('请先选择一个会话', 'error');
-    return;
-  }
-  
-  switch (action) {
-    case 'analyze':
-      analyzeCurrentSession();
-      break;
-    case 'explain':
-      sendAiMessage('请解释当前会话中的关键工具调用和它们的作用');
-      break;
-  }
-}
+
 
 // 分析当前会话
 async function analyzeCurrentSession() {
@@ -2903,14 +2882,6 @@ function initAIFeatures() {
     });
   }
   
-  // 快速操作按钮
-  document.querySelectorAll('.ai-quick-action-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const action = btn.dataset.action;
-      handleAiQuickAction(action);
-    });
-  });
-  
   // 分析会话按钮
   const analyzeSessionBtn = document.getElementById('analyzeSessionBtn');
   if (analyzeSessionBtn) {
@@ -3005,13 +2976,12 @@ function saveSettingsWithAI() {
   const defaultFilterSelect = document.getElementById('settingDefaultFilter');
   const autoRefreshCheck = document.getElementById('settingAutoRefresh');
   const showToolStatsCheck = document.getElementById('settingShowToolStats');
-  
+
   // AI 设置
   const aiProvider = document.getElementById('settingAiProvider');
   const apiKey = document.getElementById('settingApiKey');
   const aiModel = document.getElementById('settingAiModel');
-  const enableAiAssistant = document.getElementById('settingEnableAiAssistant');
-  
+
   const settings = {
     theme: themeSelect?.value || 'dark',
     pageSize: parseInt(pageSizeSelect?.value || '20'),
@@ -3021,13 +2991,12 @@ function saveSettingsWithAI() {
     ai: {
       provider: aiProvider?.value || 'iflow',
       apiKey: apiKey?.value || '',
-      model: aiModel?.value || 'iflow-rome-30ba3b',
-      enabled: enableAiAssistant?.checked || false
+      model: aiModel?.value || 'iflow-rome-30ba3b'
     }
   };
-  
+
   saveUserSettings(settings);
-  
+
   // 保存到后端
   if (settings.ai.apiKey) {
     fetch('/api/ai/config', {
@@ -3036,32 +3005,54 @@ function saveSettingsWithAI() {
       body: JSON.stringify(settings.ai)
     });
   }
-  
+
   // 应用主题
   if (settings.theme === 'light') {
     document.body.classList.add('light-mode');
   } else {
     document.body.classList.remove('light-mode');
   }
-  
+
   showToast('设置已保存');
   closeSettingsModal();
 }
 
 // 加载 AI 设置到设置面板
-function loadAISettings() {
+async function loadAISettings() {
   const settings = getUserSettings();
   const aiSettings = settings.ai || {};
-  
+
   const aiProvider = document.getElementById('settingAiProvider');
   const apiKey = document.getElementById('settingApiKey');
   const aiModel = document.getElementById('settingAiModel');
-  const enableAiAssistant = document.getElementById('settingEnableAiAssistant');
-  
-  if (aiProvider) aiProvider.value = aiSettings.provider || 'iflow';
-  if (apiKey) apiKey.value = aiSettings.apiKey || '';
-  if (aiModel) aiModel.value = aiSettings.model || 'iflow-rome-30ba3b';
-  if (enableAiAssistant) enableAiAssistant.checked = aiSettings.enabled || false;
+  const apiKeySourceHint = document.getElementById('apiKeySourceHint');
+
+  // 从后端获取配置（检查环境变量）
+  try {
+    const response = await fetch('/api/ai/config');
+    const config = await response.json();
+
+    if (aiProvider) aiProvider.value = config.provider || 'iflow';
+    if (aiModel) aiModel.value = config.model || 'iflow-rome-30ba3b';
+
+    // 如果 API Key 来自环境变量，显示提示
+    if (config.apiKeySource === 'env') {
+      if (apiKey) apiKey.placeholder = '已从环境变量读取';
+      if (apiKeySourceHint) {
+        apiKeySourceHint.style.display = 'block';
+        apiKeySourceHint.textContent = '💡 已从环境变量读取 API Key，无需手动配置';
+      }
+    } else {
+      if (apiKey) apiKey.value = aiSettings.apiKey || '';
+      if (apiKeySourceHint) apiKeySourceHint.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Failed to load AI config:', error);
+    // 回退到本地设置
+    if (aiProvider) aiProvider.value = aiSettings.provider || 'iflow';
+    if (apiKey) apiKey.value = aiSettings.apiKey || '';
+    if (aiModel) aiModel.value = aiSettings.model || 'iflow-rome-30ba3b';
+  }
 }
 
 // 覆盖原始的 showSettingsModal 函数

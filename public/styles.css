@@ -2448,30 +2448,6 @@ body.light-mode .tag-session-info {
   background: var(--bg-tertiary);
 }
 
-.ai-quick-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.ai-quick-action-btn {
-  padding: 6px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
-  border-radius: 16px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.ai-quick-action-btn:hover {
-  background: var(--accent-primary);
-  color: var(--bg-primary);
-  border-color: var(--accent-primary);
-}
-
 .ai-chat-input-wrapper {
   display: flex;
   gap: 8px;
@@ -2607,11 +2583,6 @@ body.light-mode .ai-chat-input-area {
 }
 
 body.light-mode .ai-chat-input-wrapper textarea {
-  background: var(--bg-secondary);
-  border-color: var(--border-default);
-}
-
-body.light-mode .ai-quick-action-btn {
   background: var(--bg-secondary);
   border-color: var(--border-default);
 }

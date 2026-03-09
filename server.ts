@@ -1365,38 +1365,60 @@ interface AIConfig {
   provider: 'iflow' | 'openai';
   apiKey: string;
   model: string;
-  enabled: boolean;
 }
 
-// 读取 AI 配置
+// 从环境变量获取 API Key
+function getApiKeyFromEnv(provider: 'iflow' | 'openai'): string | undefined {
+  if (provider === 'iflow') {
+    return process.env.IFLOW_API_KEY;
+  }
+  return process.env.OPENAI_API_KEY;
+}
+
+// 读取 AI 配置（支持环境变量 API Key）
 async function readAIConfig(): Promise<AIConfig> {
+  let config: AIConfig = {
+    provider: 'iflow',
+    apiKey: '',
+    model: 'iflow-rome-30ba3b'
+  };
+
   try {
     const fileExists = await fs.access(AI_CONFIG_FILE).then(() => true).catch(() => false);
-    if (!fileExists) {
-      return {
-        provider: 'iflow',
-        apiKey: '',
-        model: 'iflow-rome-30ba3b',
-        enabled: false
+    if (fileExists) {
+      const content = await fs.readFile(AI_CONFIG_FILE, 'utf8');
+      const savedConfig = JSON.parse(content);
+      config = {
+        provider: savedConfig.provider || 'iflow',
+        apiKey: savedConfig.apiKey || '',
+        model: savedConfig.model || 'iflow-rome-30ba3b'
       };
     }
-    const content = await fs.readFile(AI_CONFIG_FILE, 'utf8');
-    return JSON.parse(content);
   } catch (error) {
     console.error('Error reading AI config:', error);
-    return {
-      provider: 'iflow',
-      apiKey: '',
-      model: 'iflow-rome-30ba3b',
-      enabled: false
-    };
   }
+
+  // 如果配置文件中没有 API Key，尝试从环境变量获取
+  if (!config.apiKey) {
+    const envKey = getApiKeyFromEnv(config.provider);
+    if (envKey) {
+      config.apiKey = envKey;
+    }
+  }
+
+  return config;
 }
 
 // 保存 AI 配置
 async function saveAIConfig(config: AIConfig): Promise<void> {
   try {
-    await fs.writeFile(AI_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+    // 只保存非环境变量的配置，不保存 enabled 字段
+    const configToSave = {
+      provider: config.provider,
+      apiKey: config.apiKey,
+      model: config.model
+    };
+    await fs.writeFile(AI_CONFIG_FILE, JSON.stringify(configToSave, null, 2), 'utf8');
   } catch (error) {
     console.error('Error saving AI config:', error);
     throw error;
@@ -1407,13 +1429,18 @@ async function saveAIConfig(config: AIConfig): Promise<void> {
 app.get('/api/ai/config', async (req: Request, res: Response) => {
   try {
     const config = await readAIConfig();
-    // 不返回完整的 API Key，只返回是否存在
+    // 检查 API Key 来源
+    const envKey = getApiKeyFromEnv(config.provider);
+    const apiKeySource = config.apiKey
+      ? (envKey && config.apiKey === envKey ? 'env' : 'config')
+      : null;
+
     res.json({
       provider: config.provider,
       hasApiKey: !!config.apiKey,
       apiKeyPreview: config.apiKey ? `${config.apiKey.substring(0, 8)}...` : '',
-      model: config.model,
-      enabled: config.enabled
+      apiKeySource,
+      model: config.model
     });
   } catch (error) {
     console.error('Error getting AI config:', error);
@@ -1424,26 +1451,22 @@ app.get('/api/ai/config', async (req: Request, res: Response) => {
 // 保存 AI 配置 API
 app.post('/api/ai/config', async (req: Request, res: Response) => {
   try {
-    const { provider, apiKey, model, enabled } = req.body;
-    
-    const currentConfig = await readAIConfig();
-    
+    const { provider, apiKey, model } = req.body;
+
     const newConfig: AIConfig = {
-      provider: provider || currentConfig.provider,
-      apiKey: apiKey !== undefined ? apiKey : currentConfig.apiKey,
-      model: model || currentConfig.model,
-      enabled: enabled !== undefined ? enabled : currentConfig.enabled
+      provider: provider || 'iflow',
+      apiKey: apiKey || '',
+      model: model || 'iflow-rome-30ba3b'
     };
-    
+
     await saveAIConfig(newConfig);
-    
+
     res.json({
       success: true,
       config: {
         provider: newConfig.provider,
         hasApiKey: !!newConfig.apiKey,
-        model: newConfig.model,
-        enabled: newConfig.enabled
+        model: newConfig.model
       }
     });
   } catch (error) {
@@ -1507,9 +1530,9 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
   try {
     const { messages, context } = req.body;
     const config = await readAIConfig();
-    
-    if (!config.apiKey || !config.enabled) {
-      return res.status(400).json({ error: 'AI service not configured or disabled' });
+
+    if (!config.apiKey) {
+      return res.status(400).json({ error: 'API Key not configured' });
     }
     
     const baseUrl = config.provider === 'iflow' 
@@ -1595,9 +1618,9 @@ app.post('/api/ai/analyze', async (req: Request, res: Response) => {
   try {
     const { projectId, sessionId } = req.body;
     const config = await readAIConfig();
-    
-    if (!config.apiKey || !config.enabled) {
-      return res.status(400).json({ error: 'AI service not configured or disabled' });
+
+    if (!config.apiKey) {
+      return res.status(400).json({ error: 'API Key not configured' });
     }
     
     // 使用安全验证函数构建路径
