@@ -2942,32 +2942,29 @@ async function testAPIConnection() {
   const apiKey = document.getElementById('settingApiKey').value;
   const model = document.getElementById('settingAiModel').value;
 
-  if (!apiKey) {
-    showToast('请输入 API Key', 'error');
-    return;
-  }
-
   const statusEl = document.getElementById('apiConnectionStatus');
   statusEl.style.display = 'block';
   statusEl.className = '';
   statusEl.textContent = '保存配置中...';
 
   try {
-    // 先保存配置
-    const saveResponse = await fetch('/api/ai/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey, model })
-    });
+    // 先保存配置（如果输入框有值才保存，否则保留环境变量配置）
+    if (apiKey) {
+      const saveResponse = await fetch('/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey, model })
+      });
 
-    if (!saveResponse.ok) {
-      const saveError = await saveResponse.json();
-      statusEl.className = 'error';
-      statusEl.textContent = '✗ 保存配置失败: ' + (saveError.error || saveError.message);
-      return;
+      if (!saveResponse.ok) {
+        const saveError = await saveResponse.json();
+        statusEl.className = 'error';
+        statusEl.textContent = '✗ 保存配置失败: ' + (saveError.error || saveError.message);
+        return;
+      }
     }
 
-    // 测试连接
+    // 测试连接（后端会从环境变量读取 API Key）
     statusEl.textContent = '测试连接中...';
     const response = await fetch('/api/ai/test', { method: 'POST' });
     const result = await response.json();

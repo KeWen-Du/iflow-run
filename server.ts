@@ -1481,7 +1481,10 @@ app.post('/api/ai/test', async (req: Request, res: Response) => {
     const config = await readAIConfig();
 
     if (!config.apiKey) {
-      return res.status(400).json({ error: 'API Key not configured' });
+      return res.status(400).json({ 
+        error: '未配置 API Key', 
+        message: '请在设置中输入 API Key 或设置环境变量 IFLOW_API_KEY / OPENAI_API_KEY' 
+      });
     }
 
     const baseUrl = config.provider === 'iflow'
