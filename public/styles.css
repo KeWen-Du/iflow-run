@@ -955,19 +955,20 @@ body {
 
 .tool-call-content {
   background: rgba(0, 0, 0, 0.3);
-  padding: 8px 12px;
   border-radius: 6px;
   font-family: 'Courier New', monospace;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
-  transition: max-height 0.3s ease;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 12px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
 }
 
 .tool-call-content.expanded {
   max-height: 1000px;
+  padding: 8px 12px;
 }
 
 .tool-call-header:hover .tool-call-header-right {
@@ -1011,19 +1012,20 @@ body {
 
 .tool-result-content {
   background: rgba(0, 0, 0, 0.3);
-  padding: 8px 12px;
   border-radius: 6px;
   font-family: 'Courier New', monospace;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
-  transition: max-height 0.3s ease;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 12px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
 }
 
 .tool-result-content.expanded {
   max-height: 1000px;
+  padding: 8px 12px;
 }
 
 .tool-result-header:hover .tool-result-header-right {
@@ -1745,11 +1747,12 @@ body.light-mode .moon-icon.hidden {
   transform: rotate(180deg);
 }
 
-/* 展开状态的边框高亮 */
+/* 展开状态的边框高亮和滚动 */
 .tool-call-content.expanded,
 .tool-result-content.expanded {
   border-left: 2px solid var(--accent-primary);
   padding-left: 10px;
+  overflow-y: auto;
 }
 
 /* 工具调用和结果的悬停效果 */

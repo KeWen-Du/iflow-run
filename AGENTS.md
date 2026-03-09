@@ -4,11 +4,23 @@
 
 - **GitHub**: https://github.com/KeWen-Du/iflow-run
 - **npm**: https://www.npmjs.com/package/iflow-run
-- **版本**: 1.4.1
+- **版本**: 1.4.2
 - **作者**: dukewen <dukewen666@gmail.com>
 - **许可证**: MIT
 
 ## 更新日志
+
+### v1.4.2 (2026-03-09)
+
+**Bug 修复**
+- 🔧 **工具区块折叠问题修复** - 修复 Tool Call 和 Tool Result 区块点击折叠箭头后无法折叠的问题
+- 🔧 **CSS 折叠逻辑修正** - 修正 `.tool-call-content` 和 `.tool-result-content` 的 CSS 样式，默认状态隐藏内容，展开状态显示内容
+
+**技术细节**
+- 将默认 `max-height` 从 `200px` 改为 `0`，实现真正的折叠隐藏
+- 添加 `overflow: hidden` 确保内容在折叠时不可见
+- 展开状态添加 `overflow-y: auto` 支持长内容滚动
+- 过渡动画增加 `padding` 属性，折叠动画更流畅
 
 ### v1.4.1 (2026-03-08)
 
